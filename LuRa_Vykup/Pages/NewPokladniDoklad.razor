@@ -1,0 +1,227 @@
+﻿@inject PokladniDokladyController PDController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
+@inject PreloadService Preload
+
+@page "/PokladniDoklady/NewPokladniDoklad/{DodavatelId:int}"
+
+<div class="row">
+    <div class="col-9">
+        <Grid TItem="Vykup"
+              Class="table table-hover table-bordered"
+              DataProvider="DataLoading"
+              AllowSelection="true"
+              SelectionMode="GridSelectionMode.Multiple"
+              SelectedItemsChanged="OnSelectedItemsChanged"
+              FixedHeader="true"
+              Height="700"
+              RowClass="GetRowClass"
+              Unit="Unit.Px"
+              Responsive="true">
+
+            <GridColumn TItem="Vykup" HeaderText="Plomba" PropertyName="Plomba">
+                @context.Plomba
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Druh" PropertyName="Druh">
+                @context.Druh
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Kategorie" PropertyName="Kategorie">
+                @context.Kategorie
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="DatumVykupu" PropertyName="DatumVykupu">
+                @context.DatumVykupu.ToShortDateString()
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Cena kg" PropertyName="CenaKgPrepocet" TextAlignment="Alignment.End" HeaderTextAlignment="Alignment.End">
+                @HelperServices.VratCenu(context.Dodavatele.Ceniky, (int)context.Kategorie, (int)context.Druh).ToString("N2")
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Cena Celkem" PropertyName="CenaCelkem" TextAlignment="Alignment.End" HeaderTextAlignment="Alignment.End">
+                @GetCena(context.Vaha, HelperServices.VratCenu(context.Dodavatele.Ceniky, (int)context.Kategorie, (int)context.Druh))
+            </GridColumn>
+
+        </Grid>
+    </div>
+
+    <div class="col-3">
+        <div class="border p-2 h-100 overflow-auto @GetBorderColor" style="max-height:700px">
+
+            <div class="d-flex">
+                <button class="btn btn-sm btn-success flex-fill me-2 @GetDisabled" @onclick="UlozitDoklad">Uložit</button>
+                <a class="btn btn-sm btn-secondary flex-fill mx-2" href="/Dodaci_listy/PokladniDokladySeznam">Zpět</a>
+                <button class="btn btn-sm btn-warning flex-fill ms-2" @onclick="OnShowOffcanvasClick">Info</button>
+            </div>
+
+            <div class="fw-bold">
+                @HelperServices.NewPDDodavatel
+            </div>
+            <div class="fw-bold">
+                @HelperServices.NewPDNumber
+            </div>
+            <div class="">
+                Počet: @vybranePlomby.Count
+            </div>
+            <div class="bg-opacity-50 @GetBackgroudColor">
+                <strong>Cena celkem: @CelkemCena.ToString("N2") @vybranePlomby.Select(x => x.Dodavatele.Ceniky.Mena).FirstOrDefault().ToString() </strong>
+            </div>
+
+            <div class="mt-2">
+                <ul class="list-group">
+                    @foreach (var item in vybranePlomby)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center p-1">
+                            @item.Plomba
+                            <span class="">@(Math.Round(HelperServices.VratCenu(item.Dodavatele.Ceniky, (int)item.Kategorie, (int)item.Druh) * item.Vaha, 2).ToString("N2"))</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<Offcanvas @ref="offcanvas" Title="Informace" Size="OffcanvasSize.Large">
+    <BodyTemplate>
+        <strong>Výběr kusů</strong>
+        <p>Pro výběr používejte zaškrkávací políčko v tabulce. Systém kus předá do seznamu pro pokladní doklad, který vidíte napravo.</p>
+        <strong>Přepočet ceny</strong>
+        <p>Přepočet ceny celkem je automatický. Pokud cena celkem překročí 10 000,- tak se zvýrazní červeně a nepůjde uložit. Při částce nad 8 000,- již svítí žlutě a upozorňuje.</p>
+        <strong>Tabulka</strong>
+        <p>Při celkové ceně nad 8 000,- žačne tabulka napovídat zelenou barvou, které kusy je ještě možné přidat, aby celková cena nepřesáhla 10 000,-.</p>
+        
+    </BodyTemplate>
+</Offcanvas>
+
+
+
+
+
+@code {
+    // je potreba pro logiku LoginServices
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+    [Parameter]
+    public int DodavatelId { get; set; }
+
+    private List<Vykup> PDList { get; set; }
+    private HashSet<Vykup> vybranePlomby = new();
+    private string? UserId { get; set; }
+    private Mena Mena { get; set; } = Mena.CZK;
+    private decimal CelkemCena { get; set; }
+    private Offcanvas offcanvas;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+    }
+
+    private int GetMena(bool cena = true)
+    {
+        if (Mena == Mena.CZK)
+        {
+            if (cena)
+                return 10000;
+            else
+                return 8000;
+        }
+        if (cena)
+            return 1000;
+        else
+            return 800;
+    }
+
+    public string GetBackgroudColor => CelkemCena > GetMena() ? "bg-danger" : CelkemCena > GetMena(false) ? "bg-warning" : "bg-success";
+    public string GetBorderColor => (CelkemCena > GetMena()) ? "border-danger border-3" : "border-success border-1";
+    public string GetDisabled => CelkemCena > GetMena() ? "disabled" : string.Empty;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Preload.Hide();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    public string GetCena(decimal vaha, decimal cenaKg)
+    {
+        return Math.Round(vaha * cenaKg, 2).ToString("N2");
+    }
+
+    private Task OnSelectedItemsChanged(HashSet<Vykup> PDList)
+    {
+        vybranePlomby = PDList is not null && PDList.Any() ? PDList : new();
+        CelkemCena = Math.Round(vybranePlomby.Sum(x => x.Vaha * HelperServices.VratCenu(x.Dodavatele.Ceniky, (int)x.Kategorie, (int)x.Druh)), 2);
+        return Task.CompletedTask;
+    }
+
+    private async Task<GridDataProviderResult<Vykup>> DataLoading(GridDataProviderRequest<Vykup> request)
+    {
+        if (PDList is null)
+            PDList = await PDController.GetPokladnidokladySeznamFiltr(UserId, DodavatelId);
+            Mena = PDList.Select(x => x.Dodavatele.Ceniky.Mena).FirstOrDefault();
+
+        return await Task.FromResult(request.ApplyTo(PDList));
+    }
+
+    private string GetRowClass(Vykup data)
+    {
+        if (vybranePlomby.Any(x => x.Id == data.Id))
+            return "table-danger";
+        if(CelkemCena > GetMena(false))
+        {
+            if (vybranePlomby.Any(x => x.Id != data.Id))
+                if(HelperServices.VratCenu(data.Dodavatele.Ceniky, (int)data.Kategorie, (int)data.Druh) * data.Vaha < (GetMena() + 1 - CelkemCena))
+                    return "table-success"; //bg-opacity-50
+        }
+
+        return string.Empty;
+    }
+
+    private async Task OnShowOffcanvasClick()
+    {
+        await offcanvas?.ShowAsync();
+    }
+
+    private async Task UlozitDoklad()
+    {
+        Preload.Show(loadingText: "Ukládám...");
+        var doklad = new PokladniDoklady()
+            {
+                IdDodavatel = DodavatelId,
+                IdUzivatele = UserId,
+                CisloDokladu = HelperServices.NewPDNumber,
+                Datum = DateTime.Now,
+                IdCenik = HelperServices.NewPDCenikId,
+            };
+
+        //select pouze vybranych plomb
+        var finalList = vybranePlomby.Select(item => PDList.FirstOrDefault(x => x.Id == item.Id)).ToList();
+        bool result = await PDController.SavePokladniDoklad(finalList, doklad, UserId);
+        
+        if (result)
+        {
+            NavigationManager.NavigateTo("/Dodaci_listy/PokladniDokladySeznam");
+            ToastService.Notify(new(ToastType.Success, title: $"Pokladní doklad {HelperServices.NewPDNumber}", message: $"Pokladní doklad byl v pořádku uložen."));
+        }
+        else
+        {
+            ToastService.Notify(new(ToastType.Danger, title: $"Pokladní doklad {HelperServices.NewPDNumber}", message: $"Pokladní doklad nebyl v pořádku uložen."));
+        }
+        Preload.Hide();
+
+    }
+
+
+}

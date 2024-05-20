@@ -1,0 +1,115 @@
+﻿<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href=""><img src="Logo-web_white.png" height="30" /></a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="flex-column">
+        <div class="nav-item px-3">
+            <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                <span class="oi bi-house ms-2" aria-hidden="true"></span> Domů
+            </NavLink>
+        </div>
+        <AuthorizeView>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="Vykup/Seznam/Pridat" Match="NavLinkMatch.All"> 
+                    <span class="oi bi-cart ms-2" aria-hidden="true"></span> Vykoupit
+                </NavLink>
+            </div>
+
+               @*  <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="Vykup/Seznam" Match="NavLinkMatch.All">
+                        <span class="oi oi-list ms-2" aria-hidden="true"></span> Seznam výkupu
+                    </NavLink>
+                </div> *@
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="Vykup/SeznamFilter" Match="NavLinkMatch.All">
+                        <span class="oi bi-card-list ms-2" aria-hidden="true"></span> Vykoupená zvěř
+                    </NavLink>
+                </div>
+
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="Dodaci_listy/Seznam" Match="NavLinkMatch.All">
+                    <span class="oi bi-receipt ms-2" aria-hidden="true"></span> Dodací listy
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="Dodaci_listy/PokladniDokladySeznam" Match="NavLinkMatch.All">
+                    <span class="oi bi-cash-stack ms-2" aria-hidden="true"></span> Pokladní doklady
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="Traces/TracesSeznam" Match="NavLinkMatch.All">
+                    <span class="oi bi-passport ms-2" aria-hidden="true"></span> Traces
+                </NavLink>
+            </div>
+
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="Dodavatele/Seznam" Match="NavLinkMatch.All">
+                    <span class="oi bi-house-add ms-2" aria-hidden="true"></span> Dodavatele
+                </NavLink>
+            </div>
+            
+            <div class="nav-item px-3">
+               
+               
+                    <NavLink class="nav-link" href="Dodavatele/Cenik" Match="NavLinkMatch.All">
+                        <span class="oi bi-currency-dollar ms-2" aria-hidden="true"></span> Ceník
+                    </NavLink>
+                
+            </div>
+           
+            @if (@context.User.IsInRole(ADMINISTRATION_ROLE))
+            {
+                <div class="nav-item px-3">
+                    <NavLink class="nav-link" href="Administration" Match="NavLinkMatch.All">
+                        <span class="oi bi-incognito ms-2" aria-hidden="true"></span> Admin
+                    </NavLink>
+                </div>
+            }
+
+
+            
+        </AuthorizeView>
+
+    </nav>
+</div>
+
+
+@code {
+
+    // [Inject] IBlazorCurrentDeviceService? Device { get; set; }
+
+    public bool AndroidPhone { get; set; }
+    public bool ApplePhone { get; set; }
+
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    string ADMINISTRATION_ROLE = "Administrators";
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    // protected async override Task OnAfterRenderAsync(bool firstRender)
+    // {
+    //     if (firstRender)
+    //     {
+    //         AndroidPhone = await Device.AndroidPhone();
+    //         ApplePhone = await Device.iPhone();
+    //         StateHasChanged();
+    //     }
+    //     await base.OnAfterRenderAsync(firstRender);
+    }
+    
+

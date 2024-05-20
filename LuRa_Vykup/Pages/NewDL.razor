@@ -1,0 +1,173 @@
+﻿@inject DLController DLController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
+@inject PreloadService Preload
+
+@page "/Dodaci_listy/Novy/{DodavatelId:int}"
+
+<div class="row">
+    <div class="col-9">
+        <Grid TItem="Vykup"
+              Class="table table-hover table-bordered"
+              DataProvider="DataLoading"
+              AllowSelection="true"
+              SelectionMode="GridSelectionMode.Multiple"
+              SelectedItemsChanged="OnSelectedItemsChanged"
+              FixedHeader="true"
+              Height="700"
+              RowClass="GetRowClass"
+              Unit="Unit.Px"
+              Responsive="true">
+
+            <GridColumn TItem="Vykup" HeaderText="Plomba" PropertyName="Plomba">
+                @context.Plomba
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Váha" PropertyName="Vaha">
+                @context.Vaha
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Druh" PropertyName="Druh">
+                @context.Druh
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Kategorie" PropertyName="Kategorie">
+                @context.Kategorie
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="DatumVykupu" PropertyName="DatumVykupu">
+                @context.DatumVykupu.ToShortDateString()
+            </GridColumn>
+
+        </Grid>
+    </div>
+
+    <div class="col-3">
+        <div class="border p-2 h-100 overflow-auto" style="max-height:700px">
+
+            <div class="d-flex">
+                <button class="btn btn-sm btn-success flex-fill me-2 @GetDisabled" @onclick="UlozitDoklad">Uložit</button>
+                <a class="btn btn-sm btn-secondary flex-fill mx-2" href="/Dodaci_listy/Seznam">Zpět</a>
+                <button class="btn btn-sm btn-warning flex-fill ms-2" @onclick="OnShowOffcanvasClick">Info</button>
+            </div>
+
+            <div class="fw-bold">
+                @HelperServices.NewDLNumber
+            </div>
+            <div class="fw-bold">
+                @DodavatelNazev
+            </div>
+            <div class="">
+                Počet: @vybranePlomby.Count
+            </div>
+
+            <div class="mt-2">
+                <ul class="list-group">
+                    @foreach (var item in vybranePlomby)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center p-1">
+                            @item.Plomba
+                           @*  <span class="">@(Math.Round(HelperServices.VratCenu(item.Dodavatele.Ceniky, (int)item.Kategorie, (int)item.Druh) * item.Vaha, 2).ToString("N2"))</span> *@
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<Offcanvas @ref="offcanvas" Title="Informace" Size="OffcanvasSize.Large">
+    <BodyTemplate>
+        <strong>Výběr kusů</strong>
+        <p>Pro výběr používejte zaškrkávací políčko v tabulce. Systém kus předá do seznamu pro dodací list, který vidíte napravo.</p>
+    </BodyTemplate>
+</Offcanvas>
+
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+    [Parameter]
+    public int DodavatelId { get; set; }
+
+    private List<Vykup> DLList { get; set; }
+    private HashSet<Vykup> vybranePlomby = new();
+    private string? UserId { get; set; }
+    private Offcanvas offcanvas;
+    private string DodavatelNazev { get; set; } = string.Empty;
+
+    public string GetDisabled => vybranePlomby.Count > 0 ? string.Empty : "disabled";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+    }
+
+    private Task OnSelectedItemsChanged(HashSet<Vykup> DLList)
+    {
+        vybranePlomby = DLList is not null && DLList.Any() ? DLList : new();
+        return Task.CompletedTask;
+    }
+
+    private async Task<GridDataProviderResult<Vykup>> DataLoading(GridDataProviderRequest<Vykup> request)
+    {
+        if (DLList is null)
+            DLList = await DLController.GetVykupList(UserId, DodavatelId);
+            DodavatelNazev = DLList.FirstOrDefault().Dodavatele.Dodavatel;
+            StateHasChanged();
+            Preload.Hide();
+        return await Task.FromResult(request.ApplyTo(DLList));
+    }
+
+    private string GetRowClass(Vykup data)
+    {
+        if (vybranePlomby.Any(x => x.Id == data.Id))
+            return "table-danger";
+        return string.Empty;
+    }
+
+    private async Task OnShowOffcanvasClick()
+    {
+        await offcanvas?.ShowAsync();
+    }
+
+    private async Task UlozitDoklad()
+    {
+        Preload.Show(loadingText: "Ukládám...");
+        var doklad = new DodaciListy()
+            {
+                CisloDL = HelperServices.NewDLNumber,
+                DatumVystaveni = DateTime.Now,
+                IdDodavatel = DodavatelId,
+                IdUzivatele = UserId
+            };
+
+        
+        var finalList = vybranePlomby.Select(item => DLList.FirstOrDefault(x => x.Id == item.Id)).ToList();
+        bool result = await DLController.NewDLSave(UserId, doklad, finalList);
+
+        if (result)
+        {
+            NavigationManager.NavigateTo("/Dodaci_listy/Seznam");
+            ToastService.Notify(new(ToastType.Success, title: $"Dodací list {HelperServices.NewDLNumber}", message: $"Dodací list byl v pořádku uložen."));
+        }
+        else
+        {
+            ToastService.Notify(new(ToastType.Danger, title: $"Dodací list {HelperServices.NewDLNumber}", message: $"Dodací list nebyl v pořádku uložen."));
+        }
+        Preload.Hide();
+
+    }
+
+
+   
+
+
+}

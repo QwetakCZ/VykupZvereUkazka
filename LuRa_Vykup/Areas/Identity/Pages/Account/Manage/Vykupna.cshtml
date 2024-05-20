@@ -1,0 +1,61 @@
+﻿@page
+
+@model VykupModel
+
+@{
+    ViewData["Title"] = "Výkupna";
+    ViewData["ActivePage"] = ManageNavPages.Vykupna;
+}
+
+
+<h3>@ViewData["Title"]</h3>
+<partial name="_StatusMessage" for="StatusMessage" />
+
+<div class="row">
+    <div class="col-md-6">
+        <form id="vykupna-form" method="post">
+            <div asp-validation-summary="All" class="text-danger" role="alert"></div>
+
+            <div class="form-floating mb-3">
+                <input name="Nazev" asp-for="Nazev" class="form-control" placeholder="Vložte název Vaší výkupny." />
+                <label asp-for="Nazev" class="form-label"></label>
+            </div>
+            <div class="form-floating mb-3">
+                <input name="Firma" asp-for="Firma" class="form-control" placeholder="Název firmy." />
+                <label asp-for="Firma" class="form-label"></label>
+            </div>
+            <div class="form-floating mb-3">
+                <input name="Ico" asp-for="Ico" class="form-control" placeholder="IČO." />
+                <label asp-for="Ico" class="form-label"></label>
+            </div>
+            <div class="form-floating mb-3">
+                <input asp-for="Ulice" class="form-control" placeholder="Ulice." />
+                <label asp-for="Ulice" class="form-label"></label>
+            </div>
+
+            <div class="form-floating mb-3">
+                <input asp-for="CisloPopisne" class="form-control" placeholder="Číslo popisné." />
+                <label asp-for="CisloPopisne" class="form-label"></label>
+            </div>
+
+            <div class="form-floating mb-3">
+                <input asp-for="Mesto" class="form-control" placeholder="Město." />
+                <label asp-for="Mesto" class="form-label"></label>
+            </div>
+
+            <div class="form-floating mb-3">
+                <input asp-for="Psc" class="form-control" placeholder="PSČ." />
+                <label asp-for="Psc" class="form-label"></label>
+            </div>
+            <button id="change-email-button" type="submit" asp-page-handler="ChangeVykup" class="w-100 btn btn-primary">Změnit Výkupnu</button>
+            <a href="/" class="w-100 btn btn-secondary my-2">Zpět</a>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}
+
+
+

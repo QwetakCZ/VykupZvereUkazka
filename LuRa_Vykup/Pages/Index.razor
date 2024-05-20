@@ -1,0 +1,72 @@
+﻿@using LuRa_Vykup.Controllers
+@using LuRa_Vykup.Services
+@using LuRa_Vykup.Areas.Identity.Pages.Account.Manage
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+
+@inject LuRa_Vykup.Areas.Identity.Pages.Account.Manage.VykupModel _vykupModel
+
+
+@page "/"
+
+<PageTitle>Úvod</PageTitle>
+
+
+@if(UserId == null)
+{
+    <div class="text-center">
+        <h1>Vítej v systému výkupu firmy *FIRMA*!</h1>
+
+        <p>Pro přihlášení použij údaje, které jsi získal od firmy *FIRMA*. Po úspěšném přihlášení, si můžeš v nastavení heslo změnit.</p>
+
+        <img src="logo.png" class="m-4"/>
+    </div>
+    <div>
+        Pro testovací účely odkaz k registraci >>> <a href="/kjash564sdf645sdf63sdf1556sdf4sad3f54dsf56sd41af56sd4f3sd52af456asd4f65sad41f6das4f564asdf65d4">Registrace</a>
+    </div>
+}
+else
+{
+    @if (Vykupna == "Defaultni")
+    {
+        <div class="alert alert-danger role=alert col-10">
+       <p class="navbar-text">Prosím vyplňte informace o Vaší výkupně.</p>
+       <div class="font-weight-bold">
+           <a href="/Identity/Account/Manage/Vykupna" class="btn btn-outline-primary">
+               Vyplnit
+           </a</div>
+        </div>
+    }
+    /*
+
+    {
+        <div class="alert alert-info role=alert col-6">
+        
+       <p class="navbar-text">Tady bychom mohli zobrazovat zprávy uživatelům od Gregorovice, ktere bychom treba mohli tahat z databaze ... 
+           A nebo teda sem dat to jeho logo(jelena) at to tu neni tak prazdne. Loga u sebe nemam, tak jestli by jsi je semka mohl dat, aji tu Luru do Menu, akorat bacha, 
+           jsou dve menu, jedno tady a druhe v \Pages\Shared\_Layout</p>
+       <p style="text-align: right; color: lightgrey;">Vytvořil: Qwetak</p>
+        </div>
+    
+    }
+    */
+}
+
+
+@code{
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private string? UserId { get; set; }
+    private string Vykupna { get; set; }
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => {});
+        Vykupna = _vykupModel.GetNazevVykupny(UserId);
+    }
+}

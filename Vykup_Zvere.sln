@@ -1,0 +1,34 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.9.34723.18
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "LuRa_Vykup", "LuRa_Vykup\LuRa_Vykup.csproj", "{47C27DC2-5E98-42D9-8566-B449DF880CEF}"
+	ProjectSection(ProjectDependencies) = postProject
+		{C87B5180-48D3-4AEF-ABBA-5E378FA81A59} = {C87B5180-48D3-4AEF-ABBA-5E378FA81A59}
+	EndProjectSection
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "DeviceType", "DeviceType\DeviceType.csproj", "{C87B5180-48D3-4AEF-ABBA-5E378FA81A59}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{47C27DC2-5E98-42D9-8566-B449DF880CEF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{47C27DC2-5E98-42D9-8566-B449DF880CEF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{47C27DC2-5E98-42D9-8566-B449DF880CEF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{47C27DC2-5E98-42D9-8566-B449DF880CEF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C87B5180-48D3-4AEF-ABBA-5E378FA81A59}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C87B5180-48D3-4AEF-ABBA-5E378FA81A59}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C87B5180-48D3-4AEF-ABBA-5E378FA81A59}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C87B5180-48D3-4AEF-ABBA-5E378FA81A59}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {0A3D842B-D4F7-46BC-B56C-9D250D7AE9D0}
+	EndGlobalSection
+EndGlobal

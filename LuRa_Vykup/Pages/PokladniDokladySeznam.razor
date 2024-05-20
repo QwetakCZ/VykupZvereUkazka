@@ -1,0 +1,206 @@
+﻿@using QuestPDF.Fluent;
+@using QuestPDF.Helpers;
+@using QuestPDF.Infrastructure;
+@using FastReport.Export.PdfSimple;
+
+@inject PreloadService Preload
+@inject ToastService ToastService
+@inject PokladniDokladyController PDController
+@inject VykupController VykupController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject CreatePdfFromDL _createdPdfFromDL
+@inject IJSRuntime JS
+@inject Blazored.LocalStorage.ILocalStorageService _localStorage
+
+@using Append.Blazor.Printing
+@inject IPrintingService PrintingService
+
+@page "/Dodaci_listy/PokladniDokladySeznam"
+
+@HelperServices.GetGridFix()
+
+<div class="">
+    <div class="row g-2 mb-2">
+        <div class="col col-lg-auto">
+            <Button class="btn btn-primary" @onclick="VytvoritNovyPD">Nový pokladní doklad</Button>
+        </div>
+        <div class="col col-lg-auto">
+            <InputSelect @bind-Value="DodavatelId" class="form-select">
+                <option value="-1">Vyber dodavatele</option>
+                @if (DodavateleNazvy != null)
+                {
+                    @foreach (var item in DodavateleNazvy)
+                    {
+                        <option value="@item.Id">@item.Nazev</option>
+                    }
+                }
+            </InputSelect>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <Grid @ref="grid"
+                  TItem="PokladniDokladySeznamViewModel"
+                  Class="table table-hover table-bordered table-striped table-sm"
+                  DataProvider="DataLoad"
+                  FiltersRowCssClass="bg-primary text-white bg-opacity-25 border-bottom-0 grid-border"
+                  HeaderRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-50"
+                  AllowFiltering="true"
+                  AllowRowClick="true"
+                  OnRowClick="ClickMenu"
+                  Responsive="true"
+                  EmptyText="Žádná data"
+                  AllowPaging="true"
+                  PageSize="15"
+                  PageSizeSelectorVisible="true"
+                  PageSizeSelectorItems="@(new int[] { 10,15,20,50,100 })"
+                  PaginationItemsTextFormat="{0} - {1} z {2} položek"
+                  ItemsPerPageText="Počet položek na stránku"
+                  FiltersTranslationProvider="HelperServices.PrekladFilter">
+
+                <GridColumn TItem="PokladniDokladySeznamViewModel" HeaderText="Číslo" PropertyName="CisloDokladu">
+                    @context.CisloDokladu
+                </GridColumn>
+                <GridColumn TItem="PokladniDokladySeznamViewModel" HeaderText="Datum vystavení" PropertyName="Datum">
+                    @context.Datum
+                </GridColumn>
+                <GridColumn TItem="PokladniDokladySeznamViewModel" HeaderText="Dodavatele" PropertyName="Dodavatel">
+                    @context.Dodavatel
+                </GridColumn>
+                <GridColumn TItem="PokladniDokladySeznamViewModel" HeaderText="Ceník" PropertyName="Cenik">
+                    @context.Cenik (@context.Mena)
+                </GridColumn>
+               
+            </Grid>
+
+        </div>
+    </div>
+
+    <Offcanvas @ref="offcanvas"
+               title="Možnosti"
+               Placement="Placement.Top"
+                >
+        <BodyTemplate>
+            <div class="row">
+                <div class="col-12 text-center fs-5">
+                    <p>Vyberte jednu z možností pro doklad @OffCanvasData.CisloDokladu</p>
+                </div>
+            
+                <div class="mt-3 text-center">
+                    <a class="btn btn-primary px-3 mx-2" href="/PokladniDoklady/EditPokladniDoklad/@OffCanvasData.Id">Editace</a>
+                    <button class="btn btn-success px-3 mx-2 disabled">Tisk dokladu (A4)</button>
+
+                    <Button @ref="printBtn" class="btn btn-success px-3 mx-2" @onclick="() => Print()">Tisk dokladu</Button>
+                    <Button @ref="pdfBtn" class="btn btn-primary px-3 mx-2" @onclick="() => Print(true)">Stáhnout PDF</Button>
+                </div>
+
+            </div>
+        </BodyTemplate>
+    </Offcanvas>
+</div>
+
+
+
+@code {
+    [Inject] IBlazorCurrentDeviceService? Device { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private string? UserId { get; set; }
+    private List<PokladniDokladySeznamViewModel> PDList { get; set; }
+    public string LastPDNummer { get; set; }
+    private List<(string Nazev, int Id, int CenikId)> DodavateleNazvy { get; set; }
+    private int DodavatelId { get; set; }
+    BlazorBootstrap.Grid<PokladniDokladySeznamViewModel> grid = default!;
+    private Offcanvas offcanvas = default!;
+    private PokladniDokladySeznamViewModel OffCanvasData { get; set; } = new(new PokladniDoklady());
+    private Button printBtn = default!;
+    private Button pdfBtn = default!;
+
+
+    private async Task ClickMenu(GridRowEventArgs<PokladniDokladySeznamViewModel> args)
+    {
+        OffCanvasData = args.Item;
+        await offcanvas.ShowAsync();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        DodavatelId = -1;
+        Preload.Show();
+    }
+
+    private async Task<GridDataProviderResult<PokladniDokladySeznamViewModel>> DataLoad(GridDataProviderRequest<PokladniDokladySeznamViewModel> request)
+    {
+        if (PDList is null)
+        {
+            var data = await PDController.GetPokladnidokladySeznam(UserId);
+            PDList = data.Select(x => new PokladniDokladySeznamViewModel(x)).ToList();
+        }
+        await NactiDodavatele();
+        StateHasChanged();
+        Preload.Hide();
+        return await Task.FromResult(request.ApplyTo(PDList));
+    }
+
+    private async Task NactiDodavatele()
+    {
+        DodavateleNazvy = await PDController.GetNazvyDodavatele(UserId);
+    }
+
+    private void VytvoritNovyPD()
+    {
+        if (DodavatelId == -1)
+        {
+            ToastService.Notify(new(ToastType.Warning, title: "Dodavatel", message: "Vyber dodavatele!"));
+            return;
+        }
+
+        LastPDNummer = HelperServices.GeneratorDokladu(PDList.OrderByDescending(x => x.Id).Select(x => x.CisloDokladu).FirstOrDefault(), HelperServices.Prefix.PD);
+        HelperServices.NewPDNumber = LastPDNummer;
+        HelperServices.NewPDCenikId = DodavateleNazvy.Where(x => x.Id == DodavatelId).Select(x => x.CenikId).FirstOrDefault();
+        HelperServices.NewPDDodavatel = DodavateleNazvy.Where(x => x.Id == DodavatelId).Select(x => x.Nazev).FirstOrDefault();
+
+        NavigationManager.NavigateTo("PokladniDoklady/NewPokladniDoklad/" + DodavatelId);
+    }
+
+
+    public async Task Print(bool download = false)
+    {
+        if(download)
+            pdfBtn.ShowLoading("Vytvářím...");
+        else
+            printBtn.ShowLoading("Vytvářím...");
+
+        var db = await PDController.GetPokladnidokladySeznamDoklad(UserId, OffCanvasData.Id);
+        var _data = db.Select(x => new ExportPokladniDoklady(x)).ToList();
+
+        var report = new FastReport.Report();
+        report.Load(HelperServices.ReportCesta("report_PD.frx"));
+        report.RegisterData(_data, "Data");
+        report.SetParameterValue("Dodavatel", OffCanvasData.Dodavatel);
+        report.SetParameterValue("DodaciList", OffCanvasData.CisloDokladu);
+        report.SetParameterValue("Datum", OffCanvasData.Datum);
+        report.SetParameterValue("Mena", OffCanvasData.Mena);
+        report.SetParameterValue("Nazev", OffCanvasData.VykupnaNazev);
+        report.SetParameterValue("Ulice", OffCanvasData.VykupnaUlice);
+        report.SetParameterValue("Ico", OffCanvasData.VykupnaIco);
+        report.SetParameterValue("Firma", OffCanvasData.VykupnaFirma);
+        report.Prepare();
+        var pdf = $"report_{OffCanvasData.CisloDokladu}_{OffCanvasData.Id}.pdf";
+        report.Export(new PDFSimpleExport(), HelperServices.ReportExportPDFCesta(pdf));
+
+        printBtn.HideLoading();
+        pdfBtn.HideLoading();
+
+        if (download)
+            await JS.InvokeVoidAsync("open", "Reports/PDF/" +pdf, "_blank");
+        else
+            await PrintingService.Print(HelperServices.ReportPrintPDFCesta(pdf), PrintType.Pdf);
+    }
+
+}

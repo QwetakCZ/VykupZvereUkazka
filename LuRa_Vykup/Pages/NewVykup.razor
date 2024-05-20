@@ -1,0 +1,285 @@
+@inject VykupController VykupController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject IJSRuntime jsRuntime
+@inject ToastService ToastService
+@inject PreloadService Preload
+
+@page "/Vykup/Seznam/Pridat"
+
+<EditForm Model="_vykupModel" OnSubmit="PridatVykup">
+
+    <div class="row g-1 g-xxl-3">
+
+        <div class="col col-xxl-2">
+            <label for="plombaLabel" class="form-label">
+                Plomba
+            </label>
+            <input type="text" class="form-control" id="plombaLabel" placeholder="09-123456" @bind-value="_vykupModel.Plomba" @ref="inputFocused"/>
+        </div>
+
+        <div class="col col-xxl-2">
+            <label for="vahaLabel" class="form-label">
+                Váha
+            </label>
+            <input type="text" class="form-control" id="vahaLabel" placeholder="12,6" @bind-value="_vykupModel.Vaha" />
+        </div>
+
+        <div class="col col-xxl-2">
+            <label for="druhLabeĺ" class="form-label">
+                Druh
+            </label>
+            <select class="form-select" id="druhLabeĺ" @bind="_vykupModel.Druh">
+                <option selected disabled>Vyber druh zvěře</option>
+                @foreach (var item in Enum.GetValues(typeof(DruhZvirete)))
+                {
+                    <option value="@item">@item</option>
+                }
+            </select>
+        </div>
+
+        <div class="col col-xxl-2">
+            <label for="kategorieLabel" class="form-label">
+                Kategorie
+            </label>
+            <select class="form-select" id="kategorieLabel" @bind="_vykupModel.Kategorie">
+                <option selected disabled>Vyber kategorii</option>
+                @foreach (var item in Enum.GetValues(typeof(Kategorie)))
+                {
+                    <option value="@item">@item</option>
+                }
+            </select>
+        </div>
+
+
+
+    </div>
+
+
+
+
+
+    <div class="row g-1 g-xxl-3 py-3">
+
+        <div class="col col-xxl-2">
+            <label for="mCislo" class="form-label">
+                Prohlížitel
+            </label>
+            <input type="text" class="form-control" id="mCislo" @bind-value="_vykupModel.CisloM" />
+        </div>
+
+        <div class="col col-xxl-2">
+            <label for="dodavatelLabel" class="form-label">
+                Dodavatel
+            </label>
+            <select class="form-select" id="dodavatelLabel" @bind="_vykupModel.IdDodavatel">
+                <option selected disabled>Vyber dodavatele</option>
+                @foreach (var item in DodavateleNazvy)
+                {
+                    <option value="@item.Id">@item.Nazev</option>
+                }
+            </select>
+        </div>
+
+        <div class="col col-xxl-2">
+            <label for="mCislo" class="form-label">
+                Načíst prohlížitele z dodavatele
+            </label>
+            <button type="button" class="btn btn-primary" @onclick="NactiCisloM">
+                Načíst
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-1 g-xxl-3 my-2">
+        <div class="col col-xxl-2">
+            <button type="submit" class="btn btn-success px-5 py-2">
+                Přidat
+            </button>
+        </div>
+    </div>
+
+
+</EditForm>
+
+
+<div class="row">
+    <div class="col-md-12">
+
+        <table class="table table-hover table-sm table-striped">
+            <thead>
+                <tr>
+                    <th>Plomba</th>
+                    <th>Druh</th>
+                    <th>Váha</th>
+                    <th>Kategorie</th>
+                    <th>Dodavatel</th>
+                    <th>Prohlížitel</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var data in VykupList)
+                {
+                    <tr>
+                        <td>@data.Plomba</td>
+                        <td>@data.Druh</td>
+                        <td>@data.Vaha</td>
+                        <td>@data.Kategorie</td>
+                        <td>@data.Dodavatele.Dodavatel</td>
+                        <td>@data.CisloM</td>
+                        <td>
+                            <a href="/Vykup/Seznam/Editovat/@data.Id/Vykup" class="btn btn-outline-primary small py-0">Editovat</a>
+                            <button type="button" class="btn btn-outline-danger small py-0" @onclick="() => DeleteDialog(data.Id, data.Plomba, data.DodaciListId)">Vymazat</button>
+
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+
+    </div>
+</div>
+
+
+
+<ConfirmDialog @ref="dialog" />
+
+@code {
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+    private List<Models.Vykup> VykupList { get; set; } = new();
+    Vykup _vykupModel = new();
+    private List<(string Nazev, int Id)> DodavateleNazvy { get; set; } = new();
+
+    private string? UserId { get; set; }
+    private ConfirmDialog dialog = default!;
+    protected ElementReference inputFocused;
+
+    public async Task PridatVykup()
+    {
+        var _vykupNovy = new Vykup()
+            {
+                Plomba = _vykupModel.Plomba,
+                Vaha = _vykupModel.Vaha,
+                Druh = _vykupModel.Druh,
+                Kategorie = _vykupModel.Kategorie,
+                IdDodavatel = _vykupModel.IdDodavatel,
+                CisloM = _vykupModel.CisloM ?? "0",
+                DatumVykupu = DateTime.Now
+            };
+
+        //validace
+        if (string.IsNullOrEmpty(_vykupModel.Plomba)) { Validace("Není vyplněna PLOMBA"); return; }
+        if (_vykupModel.Vaha == decimal.Zero || _vykupModel.Vaha == null) { Validace("Není vyplněna VÁHA"); return; }
+        if (_vykupModel.Druh == null) { Validace("Není vybrán DRUH"); return; }
+        if (_vykupModel.Kategorie == null) { Validace("Není vybrána KATEGORIE"); return; }
+        if (_vykupModel.IdDodavatel == 0) { Validace("Není vybrán DODAVATEL"); return; }
+        if (string.IsNullOrEmpty(_vykupModel.CisloM)) { Validace("Není vyplněna PROHLÍŽITEL"); return; }
+
+        Preload.Show();
+        var result = await VykupController.CreateVykupAsync(UserId, _vykupNovy);
+
+        if (result)
+        {
+            await LoadVykupPage();
+            _vykupModel.Plomba = string.Empty;
+            _vykupModel.Vaha = decimal.Zero;
+            _vykupModel.Kategorie = Kategorie.I;
+            _vykupModel.CisloM = _vykupNovy.CisloM;
+            await jsRuntime.InvokeVoidAsync("SetFocusToElement", inputFocused);
+        }
+        else
+        {
+            Validace("Vykoupený kus nebyl v pořádku přidán!");
+        }
+        Preload.Hide();
+    }
+
+
+    private void Validace(string chyba)
+    {
+        ToastService.Notify(new(ToastType.Danger, title: $"Upozornění", message: chyba));
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+    }
+
+    protected async override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await LoadVykupPage();
+            await NactiDodavatele();
+            _vykupModel.CisloM = "0";
+            _vykupModel.Kategorie = Kategorie.I;
+            _vykupModel.Druh = DruhZvirete.Divočák;
+            StateHasChanged();
+            Preload.Hide();
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    public async Task LoadVykupPage()
+    {
+        VykupList = await VykupController.GetVykupLast(UserId, 5);
+        StateHasChanged();
+    }
+
+    private async Task NactiDodavatele()
+    {
+        DodavateleNazvy = await VykupController.GetNazvyDodavatele(UserId);
+        _vykupModel.IdDodavatel = DodavateleNazvy.FirstOrDefault().Id;
+    }
+
+    private async Task DeleteDialog(int id, string plomba, int? dodaciList)
+    {
+        var confirmation = await dialog.ShowAsync(
+            title: "Smazání vykoupeného kusu",
+            message1: $"Vážně chcete kus {plomba} smazat?",
+            confirmDialogOptions: new ConfirmDialogOptions()
+                {
+                    YesButtonColor = ButtonColor.Danger,
+                    YesButtonText = "Smazat",
+                    NoButtonColor = ButtonColor.Success,
+                    NoButtonText = "Zpět"
+                }
+        );
+
+        if (confirmation)
+        {
+            if (dodaciList != null)
+            {
+                ToastService.Notify(new(ToastType.Danger, title: $"Smazání vykoupeného kusu {_vykupModel.Plomba}", message: $"Vykoupený kus nelze smazat pokud je v dodacím listu."));
+                return;
+            }
+
+            Preload.Show();
+            bool success = await VykupController.DeleteVykupAsync(id);
+            if (success)
+            {
+                ToastService.Notify(new(ToastType.Success, title: $"Smazání kusu {plomba}", message: $"Vykoupený kus byl v pořádku smazán."));
+            }
+            else
+            {
+                ToastService.Notify(new(ToastType.Danger, title: $"Smazání kusu {plomba}", message: $"Vykoupený kus nebyl v pořádku smazán!"));
+            }
+            await LoadVykupPage();
+            Preload.Hide();
+        }
+    }
+
+    private async Task NactiCisloM()
+    {
+        _vykupModel.CisloM = await VykupController.GetCisloM(_vykupModel.IdDodavatel);
+        StateHasChanged();
+    }
+}
+

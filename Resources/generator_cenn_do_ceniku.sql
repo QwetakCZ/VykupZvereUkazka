@@ -1,0 +1,4 @@
+DECLARE @id INT
+SET @id = 25
+
+UPDATE "LuRa_Vykup"."dbo"."Ceniky" SET "SrnciI"=ROUND(RAND() * 130, 1), "SrnciII"=ROUND(RAND() * 130, 1), "SrnciIII"=ROUND(RAND() * 130, 1), "DanekI"=ROUND(RAND() * 130, 1), "DanekII"=ROUND(RAND() * 130, 1), "DanekIII"=ROUND(RAND() * 130, 1), "JelenI"=ROUND(RAND() * 130, 1), "JelenII"=ROUND(RAND() * 130, 1), "JelenIII"=ROUND(RAND() * 130, 1), "SikaI"=ROUND(RAND() * 130, 1), "SikaII"=ROUND(RAND() * 130, 1), "SikaIII"=ROUND(RAND() * 130, 1), "MuflonI"=ROUND(RAND() * 130, 1), "MuflonII"=ROUND(RAND() * 130, 1), "MuflonIII"=ROUND(RAND() * 130, 1), "DivocakI"=ROUND(RAND() * 130, 1), "DivocakII"=ROUND(RAND() * 130, 1), "DivocakIII"=ROUND(RAND() * 130, 1) WHERE  "Id"=@id;

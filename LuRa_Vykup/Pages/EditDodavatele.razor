@@ -1,0 +1,154 @@
+﻿@using Microsoft.AspNetCore.Mvc.ViewFeatures
+@using System.ComponentModel.DataAnnotations;
+@using System.ComponentModel.DataAnnotations.Schema;
+@inject DodavateleController DodavateleController
+@inject CenikyController CenikyController
+@inject NavigationManager NavigationManager
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject ToastService ToastService
+@inject PreloadService Preload
+
+@page "/Dodavatele/Seznam/EditDetail/{Id:int}"
+
+
+
+<EditForm Model="@Dodavatel" OnValidSubmit="@SaveDodavatel">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+    <h5 class="mb-4">Editace dodavatele</h5>
+
+    <div class="row my-2">
+        <div class="col col-xxl-2">
+            <div class="form-floating">
+                <InputText @bind-Value="Dodavatel.Dodavatel" class="form-control" placeholder="Aleš Novák - Pohočelice" />
+                <label>@nameof(Dodavatel.Dodavatel)</label>
+            </div>
+        </div>
+        <div class="col col-xxl-2">
+            <div class="form-floating">
+                <InputText @bind-Value="Dodavatel.CisloM" class="form-control" placeholder="M65412" />
+                <label>@nameof(Dodavatel.CisloM)</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="row my-2">
+        <div class="col col-xxl-2">
+            <div class="form-floating">
+                <InputText @bind-Value="Dodavatel.Telefon" class="form-control" placeholder="777123456" />
+                <label>@nameof(Dodavatel.Telefon)</label>
+            </div>
+        </div>
+
+        <div class="col col-xxl-2">
+            <div class="form-floating">
+                <InputText @bind-Value="Dodavatel.Email" class="form-control" placeholder="email@gmail.com" />
+                <label>@nameof(Dodavatel.Email)</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="row my-2">
+        <div class="col col-xxl-2">
+            <div class="form-floating">
+                <InputSelect @bind-Value="Dodavatel.CenikId" class="form-select">
+                    <option selected disabled>Vyber ceník</option>
+                    @foreach (var item in CenikyList)
+                    {
+                        <option value="@item.Id">@item.Nazev</option>
+                    }
+
+                </InputSelect>
+                <label>Ceník</label>
+            </div>
+        </div>
+    </div>
+
+    <ConfirmDialog @ref="dialog" />
+
+    <!-- Ostatní vstupy formuláře -->
+
+    <button type="submit" class="btn btn-primary">Uložit</button>
+    <a href="/Dodavatele/Seznam" class="btn btn-secondary">Zpět</a>
+    <button type="button" class="btn btn-danger" @onclick="DeleteDialog">Vymazat</button>
+
+</EditForm>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+    [Parameter]
+    public int Id { get; set; }
+
+    private Models.Dodavatele? Dodavatel { get; set; } = new();
+    private List<(string Nazev, int Id)> CenikyList { get; set; } = new();
+    private string UserId { get; set; }
+    private ConfirmDialog dialog = default!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if(firstRender)
+        {
+            Dodavatel = await DodavateleController.GetDodavatele(UserId, Id);
+            CenikyList = await CenikyController.GetCenikyNazvy(UserId);
+            StateHasChanged();
+            Preload.Hide();
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+    }
+
+    private async Task DeleteDialog()
+    {
+        var confirmation = await dialog.ShowAsync(
+            title: $"Smazání dodavatele {Dodavatel.Dodavatel}",
+            message1: "Vážně chcete dodavatele smazat?",
+            message2: "Pokud má dodavatel již evidovanou zvěř, nebude smazán!",
+            confirmDialogOptions: new ConfirmDialogOptions()
+                {
+                    YesButtonColor = ButtonColor.Danger,
+                    YesButtonText = "Smazat",
+                    NoButtonColor = ButtonColor.Success,
+                    NoButtonText = "Zpět"
+                }
+        );
+
+        if (confirmation)
+        {
+            bool success = await DodavateleController.DeleteDodavateleAsync(Dodavatel.Id);
+            if (success)
+            {
+                NavigationManager.NavigateTo("/Dodavatele/Seznam");
+                ToastService.Notify(new(ToastType.Success, title: $"Smazání dodavatele {Dodavatel.Dodavatel}", message: $"Dodavatel byl v pořádku smazán."));
+            }
+            else
+            {
+                ToastService.Notify(new(ToastType.Danger, title: $"Smazání dodavatele {Dodavatel.Dodavatel}", message: $"Dodavatel má na skladě zvěř, nemůže být vymazán!"));
+            }
+        }
+    }
+
+    private async Task SaveDodavatel()
+    {
+        bool success = await DodavateleController.UpdateDodavateleAsync(Dodavatel);
+
+        if (success)
+        {
+            NavigationManager.NavigateTo("/Dodavatele/Seznam");
+            ToastService.Notify(new(ToastType.Success, title: $"Úprava dodavatele {Dodavatel.Dodavatel}", message: $"Dodavatel byl v pořádku upraven."));
+        }
+        else
+        {
+            ToastService.Notify(new(ToastType.Danger, title: $"Úprava dodavatele {Dodavatel.Dodavatel}", message: $"Dodavatel nebyl v pořádku upraven."));
+
+        }
+    }
+
+}

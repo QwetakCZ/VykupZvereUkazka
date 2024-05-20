@@ -1,0 +1,136 @@
+﻿@using QuestPDF.Fluent;
+@using QuestPDF.Helpers;
+@using QuestPDF.Infrastructure;
+
+@inject PreloadService Preload
+@inject ToastService ToastService
+@inject PokladniDokladyController PDController
+@inject TracesController TracesController
+@inject VykupController VykupController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject CreatePdfFromDL _createdPdfFromDL
+@inject IJSRuntime JS
+@inject Blazored.LocalStorage.ILocalStorageService _localStorage
+
+@using Append.Blazor.Printing
+@using System.Diagnostics
+@inject IPrintingService PrintingService
+
+@page "/Traces/TracesSeznam"
+
+@HelperServices.GetGridFix()
+
+<div class="">
+    <div class="row g-2 mb-2">
+        <div class="col col-lg-auto">
+            <Button class="btn btn-primary" @onclick="VytvoritNovyTracer">Nový Traces</Button>
+        </div>
+        
+    </div>
+
+    <div class="row">
+        <div class="col-12">
+            <Grid @ref="grid"
+                  TItem="TracesSeznamViewModel"
+                  Class="table table-hover table-bordered table-striped table-sm"
+                  DataProvider="DataLoad"
+                  FiltersRowCssClass="bg-primary text-white bg-opacity-25 border-bottom-0 grid-border"
+                  HeaderRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-50"
+                  AllowFiltering="true"
+                  AllowRowClick="true"
+                  OnRowClick="ClickMenu"
+                  Responsive="true"
+                  EmptyText="Žádná data"
+                  AllowPaging="true"
+                  PageSize="15"
+                  PageSizeSelectorVisible="true"
+                  PageSizeSelectorItems="@(new int[] { 10,15,20,50,100 })"
+                  PaginationItemsTextFormat="{0} - {1} z {2} položek"
+                  ItemsPerPageText="Počet položek na stránku"
+                  FiltersTranslationProvider="HelperServices.PrekladFilter">
+
+                <GridColumn TItem="TracesSeznamViewModel" HeaderText="Číslo" PropertyName="CisloTraces">
+                    @context.CisloTraces
+                </GridColumn>
+                <GridColumn TItem="TracesSeznamViewModel" HeaderText="Datum vystavení" PropertyName="Datum">
+                    @context.Datum
+                </GridColumn>
+                
+               
+            </Grid>
+
+        </div>
+    </div>
+
+    <Offcanvas @ref="offcanvas"
+               title="Možnosti"
+               Placement="Placement.Top"
+                >
+        <BodyTemplate>
+            <div class="row">
+                <div class="col-12 text-center fs-5">
+                    <p>Vyberte jednu z možností pro doklad @OffCanvasData.CisloTraces</p>
+                </div>
+            
+                <div class="mt-3 text-center">
+                    <a class="btn btn-primary px-3 mx-2" href="/Traces/EditTraces/@OffCanvasData.Id">Editace</a>
+                    <button class="btn btn-success px-3 mx-2">Tisk dokladu (A4)</button>
+                    <button class="btn btn-success px-3 mx-2">Tisk dokladu</button>
+                </div>
+
+            </div>
+        </BodyTemplate>
+    </Offcanvas>
+</div>
+
+@code {
+    [Inject] IBlazorCurrentDeviceService? Device { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private string? UserId { get; set; }
+    private List<TracesSeznamViewModel> TracerList { get; set; }
+    public string LastTracesNummer { get; set; }
+    BlazorBootstrap.Grid<TracesSeznamViewModel> grid = default!;
+    private Offcanvas offcanvas = default!;
+    private TracesSeznamViewModel OffCanvasData { get; set; } = new(new Traces());
+
+    private async Task ClickMenu(GridRowEventArgs<TracesSeznamViewModel> args)
+    {
+        OffCanvasData = args.Item;
+        await offcanvas.ShowAsync();
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+    }
+
+    private async Task<GridDataProviderResult<TracesSeznamViewModel>> DataLoad(GridDataProviderRequest<TracesSeznamViewModel> request)
+    {
+        if (TracerList is null)
+        {
+            var data = await TracesController.GetTracesSeznam(UserId);
+            TracerList = data.Select(x => new TracesSeznamViewModel(x)).ToList();
+        }
+        
+        StateHasChanged();
+        Preload.Hide();
+        return await Task.FromResult(request.ApplyTo(TracerList));
+    }
+    
+    
+
+    private async void VytvoritNovyTracer()
+    {
+        
+        LastTracesNummer = HelperServices.GeneratorDokladu(TracerList.OrderByDescending(x => x.Id).Select(x => x.CisloTraces).FirstOrDefault(), HelperServices.Prefix.TR);
+        HelperServices.NewTracesNumber = LastTracesNummer;
+        
+        NavigationManager.NavigateTo("Traces/NovyTraces");
+    }
+
+}

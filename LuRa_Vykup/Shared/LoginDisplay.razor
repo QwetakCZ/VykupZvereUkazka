@@ -1,0 +1,14 @@
+﻿<AuthorizeView>
+    <Authorized>
+        <a class="mx-3" href="Identity/Account/Manage">Nastavení - @context.User.Identity?.Name!</a>
+        <form method="post" action="Identity/Account/Logout">
+            <button type="submit" class="nav-link btn btn-link">Odhlásit</button>
+        </form>
+    </Authorized>
+    <NotAuthorized>
+        <!--
+        <a href="Identity/Account/Register">Registrace</a>
+        -->
+        <a href="Identity/Account/Login">Přihlášení</a>
+    </NotAuthorized>
+</AuthorizeView>

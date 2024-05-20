@@ -1,0 +1,61 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Report ScriptLanguage="CSharp" ReportInfo.Created="05/12/2024 23:35:04" ReportInfo.Modified="05/14/2024 23:57:10" ReportInfo.CreatorVersion="2024.2.0.0">
+  <Dictionary>
+    <BusinessObjectDataSource Name="Data" ReferenceName="Data" DataType="System.Int32" Enabled="true">
+      <Column Name="Plomba" DataType="System.String"/>
+      <Column Name="Vaha" DataType="System.Decimal"/>
+      <Column Name="Druh" DataType="System.String"/>
+      <Column Name="Cena" DataType="System.Decimal"/>
+      <Column Name="Kategorie" DataType="System.String"/>
+      <Column Name="CenaCelkem" DataType="System.Decimal"/>
+    </BusinessObjectDataSource>
+    <Parameter Name="Dodavatel" DataType="System.String" AsString=""/>
+    <Parameter Name="DodaciList" DataType="System.String" AsString=""/>
+    <Parameter Name="Datum" DataType="System.String" AsString=""/>
+    <Parameter Name="Mena" DataType="System.String" AsString=""/>
+    <Parameter Name="Nazev" DataType="System.String" AsString=""/>
+    <Parameter Name="Ulice" DataType="System.String" AsString=""/>
+    <Parameter Name="Ico" DataType="System.String" AsString=""/>
+    <Parameter Name="Firma" DataType="System.String" AsString=""/>
+    <Total Name="TotalKs" Expression="[Data.Vaha]" Evaluator="Data1"/>
+    <Total Name="CelkemCena" Expression="[Data.CenaCelkem]" Evaluator="Data1"/>
+  </Dictionary>
+  <ReportPage Name="Page1" PaperWidth="57" PaperHeight="100" LeftMargin="2" TopMargin="5" RightMargin="2" BottomMargin="5" Watermark.Font="Arial, 60pt" UnlimitedHeight="true" LastPageSource="261" FirstPageSource="261">
+    <ReportTitleBand Name="ReportTitle1" Width="200.34" Height="148.18">
+      <TextObject Name="Text1" Left="9.45" Top="49.39" Width="179.55" Height="63.13" Text="Odběratel:&#13;&#10;[Firma]&#13;&#10;[Ulice]&#13;&#10;IČO: [Ico]" HorzAlign="Center" Font="Arial, 8pt, style=Bold"/>
+      <TextObject Name="Text2" Left="9.45" Top="18.9" Width="85.05" Height="13.7" Text="[DodaciList]" Font="Arial, 8pt"/>
+      <TextObject Name="Text16" Left="9.45" Top="0.5" Width="179.55" Height="16.38" Text="Příjmový pokladní doklad" HorzAlign="Center" Font="Arial, 10pt, style=Bold"/>
+      <TextObject Name="Text19" Left="9.45" Top="113.4" Width="179.55" Height="34.78" Text="Dodavatel: &#13;&#10;[Dodavatel]" HorzAlign="Center" Font="Arial, 8pt"/>
+      <TextObject Name="Text20" Left="103.95" Top="18.9" Width="85.05" Height="13.7" Text="[Datum]" HorzAlign="Right" Font="Arial, 8pt"/>
+    </ReportTitleBand>
+    <PageHeaderBand Name="PageHeader1" Top="148.91" Width="200.34" Height="47.25" Border.Lines="Bottom">
+      <TextObject Name="Text3" Top="9.45" Width="75.6" Height="15.12" Text="Plomba" Font="Arial, 8pt"/>
+      <TextObject Name="Text6" Left="85.05" Top="9.45" Width="47.25" Height="15.12" Text="Vaha" HorzAlign="Right" Font="Arial, 8pt"/>
+      <TextObject Name="Text9" Left="141.75" Top="9.45" Width="56.7" Height="15.12" Text="Druh" HorzAlign="Right" Font="Arial, 8pt"/>
+      <TextObject Name="Text17" Left="75.6" Top="28.35" Width="56.7" Height="15.12" Text="Cena kg" HorzAlign="Right" Font="Arial, 8pt"/>
+      <TextObject Name="Text18" Left="141.75" Top="28.35" Width="56.7" Height="15.12" Text="Celkem" HorzAlign="Right" Font="Arial, 8pt"/>
+    </PageHeaderBand>
+    <DataBand Name="Data1" Top="196.88" Width="200.34" Height="38.2" Border.Lines="Bottom" Border.BottomLine.Style="Dot" DataSource="Data">
+      <TextObject Name="Text4" Width="75.6" Height="15.12" Text="[Data.Plomba]" Font="Arial, 8pt"/>
+      <TextObject Name="Text5" Left="85.05" Width="47.25" Height="15.12" Text="[Data.Vaha]" Format="Number" Format.UseLocale="true" Format.DecimalDigits="2" HorzAlign="Right" Font="Arial, 8pt"/>
+      <TextObject Name="Text7" Left="141.75" Width="56.7" Height="15.12" Text="[Data.Druh]" HorzAlign="Right" Font="Arial, 8pt"/>
+      <TextObject Name="Text10" Left="84.88" Top="19.3" Width="47.25" Height="15.12" Text="[Data.Cena]" Format="Number" Format.UseLocale="true" Format.DecimalDigits="2" HorzAlign="Right" Font="Arial, 8pt, style=Italic"/>
+      <TextObject Name="Text15" Left="141.75" Top="18.9" Width="56.7" Height="15.12" Text="[Data.CenaCelkem]" Format="Number" Format.UseLocale="true" Format.DecimalDigits="2" HorzAlign="Right" Font="Arial, 8pt, style=Bold, Italic"/>
+    </DataBand>
+    <PageFooterBand Name="PageFooter1" Top="235.81" Width="200.34" Height="19.28" Border.Lines="Top">
+      <TextObject Name="Text11" Top="3.53" Width="66.15" Height="15.12" Text="Celkem" Font="Arial, 8pt"/>
+      <TextObject Name="Text12" Left="142.15" Top="3.68" Width="56.7" Height="15.12" Text="[CelkemCena] [Mena]" HorzAlign="Right" Font="Arial, 8pt, style=Bold">
+        <Formats>
+          <NumberFormat/>
+          <GeneralFormat/>
+        </Formats>
+      </TextObject>
+      <TextObject Name="Text14" Left="75.86" Top="4.16" Width="56.7" Height="15.12" Text="[TotalKs] kg" HorzAlign="Right" Font="Arial, 8pt, style=Bold">
+        <Formats>
+          <NumberFormat/>
+          <GeneralFormat/>
+        </Formats>
+      </TextObject>
+    </PageFooterBand>
+  </ReportPage>
+</Report>

@@ -1,0 +1,83 @@
+﻿@using LuRa_Vykup.Controllers
+@using LuRa_Vykup.Services
+@inject DodavateleController DodavateleController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject PreloadService Preload
+
+@page "/Dodavatele/Seznam"
+
+<a href="/Dodavatele/Seznam/Pridej" class="btn btn-primary mb-2">
+    Přidat dodavatele
+</a>
+
+@HelperServices.GetGridFix()
+<div class="row">
+    <div class="col-12">
+        <Grid @ref="grid"
+              TItem="DodavatelSeznamViewModel"
+              Class="table table-hover table-bordered table-striped table-sm"
+              DataProvider="DataLoad"
+              FiltersRowCssClass="bg-primary text-white bg-opacity-25 border-bottom-0 grid-border"
+              HeaderRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-50"
+              AllowFiltering="true"
+              AllowRowClick="true"
+              Responsive="true"
+              OnRowClick="Click"
+              EmptyText="Žádná data"
+              AllowPaging="true"
+              PageSize="15"
+              PageSizeSelectorVisible="true"
+              PageSizeSelectorItems="@(new int[] { 10,15,20,50,100 })"
+              PaginationItemsTextFormat="{0} - {1} z {2} položek"
+              ItemsPerPageText="Počet položek na stránku"
+              FiltersTranslationProvider="HelperServices.PrekladFilter">
+
+            <GridColumn TItem="DodavatelSeznamViewModel" HeaderText="Jméno" PropertyName="Jmeno">
+                @context.Jmeno
+            </GridColumn>
+            <GridColumn TItem="DodavatelSeznamViewModel" HeaderText="Číslo prohlížitele" PropertyName="CisloM">
+                @context.CisloM
+            </GridColumn>
+            <GridColumn TItem="DodavatelSeznamViewModel" HeaderText="Ceník" PropertyName="Cenik">
+                @context.Cenik (@context.Mena)
+            </GridColumn>
+        </Grid>
+    </div>
+</div>
+
+@code {
+    // je potreba pro logiku LoginServices
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private List<DodavatelSeznamViewModel> DodavateleList { get; set; }
+    BlazorBootstrap.Grid<DodavatelSeznamViewModel> grid = default!;
+    private string? UserId { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+
+    }
+
+    private async Task<GridDataProviderResult<DodavatelSeznamViewModel>> DataLoad(GridDataProviderRequest<DodavatelSeznamViewModel> request)
+    {
+        if (DodavateleList is null)
+        {
+            var data = await DodavateleController.GetDodavateleList(UserId);
+
+            DodavateleList = data.Select(x => new DodavatelSeznamViewModel(x)).ToList();
+        }
+
+        Preload.Hide();
+        return await Task.FromResult(request.ApplyTo(DodavateleList));
+    }
+
+    private async Task Click(GridRowEventArgs<DodavatelSeznamViewModel> args)
+    {
+        NavigationManager.NavigateTo($"/Dodavatele/Seznam/EditDetail/{args.Item.Id}");
+    }
+}

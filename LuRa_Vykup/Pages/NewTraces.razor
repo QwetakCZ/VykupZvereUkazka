@@ -1,0 +1,190 @@
+﻿@inject PokladniDokladyController PDController
+@inject TracesController TracesController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
+@inject PreloadService Preload
+
+@page "/Traces/NovyTraces"
+
+<div class="row">
+    <div class="col-9">
+        <Grid TItem="Vykup"
+              Class="table table-hover table-bordered"
+              DataProvider="DataLoading"
+              AllowSelection="true"
+              SelectionMode="GridSelectionMode.Multiple"
+              SelectedItemsChanged="OnSelectedItemsChanged"
+              FixedHeader="true"
+              Height="700"
+              RowClass="GetRowClass"
+              Unit="Unit.Px"
+              Responsive="true">
+
+            <GridColumn TItem="Vykup" HeaderText="Plomba" PropertyName="Plomba">
+                @context.Plomba
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Druh" PropertyName="Druh">
+                @context.Druh
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Kategorie" PropertyName="Kategorie">
+                @context.Kategorie
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Datum Výkupu" PropertyName="DatumVykupu">
+                @context.DatumVykupu.ToShortDateString()
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Dodavatel" PropertyName="IdDodavatel" TextAlignment="Alignment.End" HeaderTextAlignment="Alignment.End">
+                @context.Dodavatele.Dodavatel
+            </GridColumn>
+
+           
+
+        </Grid>
+    </div>
+
+    <div class="col-3">
+        <div class="border p-2 h-100 overflow-auto" style="max-height:700px">
+
+            <div class="d-flex">
+                <button class="btn btn-sm btn-success flex-fill me-2" @onclick="UlozitDoklad">Uložit</button>
+                <a class="btn btn-sm btn-secondary flex-fill mx-2" href="/Traces/TracesSeznam">Zpět</a>
+                <button class="btn btn-sm btn-warning flex-fill ms-2" @onclick="OnShowOffcanvasClick">Info</button>
+            </div>
+
+            
+            <div class="fw-bold">
+                @HelperServices.NewTracesNumber
+            </div>
+            <div class="">
+                Počet: @vybranePlomby.Count
+            </div>
+            
+
+            <div class="mt-2">
+                <ul class="list-group">
+                    @foreach (var item in vybranePlomby)
+                    {
+                        
+                        <li class="list-group-item d-inline-flex justify-content-between p-1">
+                            <span><strong>Plomba:</strong> @item.Plomba</span>
+                            <span class="">@item.Druh</span>
+                        </li>
+                    }
+                </ul>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+
+<Offcanvas @ref="offcanvas" Title="Informace" Size="OffcanvasSize.Large">
+    <BodyTemplate>
+        <strong>Výběr kusů</strong>
+        <p>Pro výběr používejte zaškrkávací políčko v tabulce. Systém kus předá do seznamu pro Traces, který vidíte napravo.</p>
+       
+    </BodyTemplate>
+</Offcanvas>
+
+
+
+
+
+@code {
+    // je potreba pro logiku LoginServices
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+    [Parameter]
+    public int DodavatelId { get; set; }
+    private List<Vykup> TracesList { get; set; }
+    private HashSet<Vykup> vybranePlomby = new();
+    private string? UserId { get; set; }
+    private Offcanvas offcanvas;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        
+        Preload.Show();
+    }
+
+ 
+    
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Preload.Hide();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    
+    private Task OnSelectedItemsChanged(HashSet<Vykup> tracesList)
+    {
+        vybranePlomby = tracesList is not null && tracesList.Any() ? tracesList : new();
+        return Task.CompletedTask;
+    }
+
+    private async Task<GridDataProviderResult<Vykup>> DataLoading(GridDataProviderRequest<Vykup> request)
+    {
+        if (TracesList is null)
+            TracesList = await TracesController.GetTracesSeznamFiltr(UserId);
+ 
+
+        return await Task.FromResult(request.ApplyTo(TracesList));
+    }
+
+    private string GetRowClass(Vykup data)
+    {
+        if (vybranePlomby.Any(x => x.Id == data.Id))
+            return "table-danger";
+       
+        return string.Empty;
+    }
+
+    private async Task OnShowOffcanvasClick()
+    {
+        await offcanvas?.ShowAsync();
+    }
+
+    private async Task UlozitDoklad()
+    {
+        Preload.Show(loadingText: "Ukládám...");
+        var doklad = new Traces()
+            {
+                CisloTraces = HelperServices.NewTracesNumber,
+                IdUzivatele = UserId,
+                Datum = DateTime.Now,
+                
+            };
+
+        //select pouze vybranych plomb
+        var finalList = vybranePlomby.Select(item => TracesList.FirstOrDefault(x => x.Id == item.Id)).ToList();
+        bool result = await TracesController.SaveTraces(finalList, doklad, UserId);
+        
+        if (result)
+        {
+            NavigationManager.NavigateTo("/Traces/TracesSeznam");
+            ToastService.Notify(new(ToastType.Success, title: $"Traces {HelperServices.NewTracesNumber}", message: $"Traces byl v pořádku uložen."));
+        }
+        else
+        {
+            ToastService.Notify(new(ToastType.Danger, title: $"Traces {HelperServices.NewTracesNumber}", message: $"Traces nebyl v pořádku uložen."));
+        }
+        Preload.Hide();
+
+    }
+
+   
+
+}

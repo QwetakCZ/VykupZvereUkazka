@@ -1,0 +1,217 @@
+﻿@using System.Diagnostics
+@using Microsoft.AspNetCore.Mvc.ViewFeatures
+@using System.ComponentModel.DataAnnotations;
+@using System.ComponentModel.DataAnnotations.Schema;
+@inject DodavateleController DodavateleController
+@inject CenikyController CenikyController
+@inject NavigationManager NavigationManager
+
+@page "/Dodavatele/Cenik/Pridej"
+
+<h5 class="mb-4">Nový ceník</h5>
+
+
+<EditForm Model="@Cenik" OnValidSubmit="@AddCenik">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="row g-1 g-xxl-3">
+            <div class="col col-xxl-2">
+                <div class="form-floating mb-2">
+                    <InputText @bind-Value="Cenik.Nazev" id="cenikNazev" class="form-control" />
+                    <label>Název</label>
+                </div>
+            </div>
+            <div class="col col-xxl-2">
+                <div class="form-floating mb-2">
+                    <InputSelect id="mena" @bind-Value="Cenik.Mena" class="form-select   ">
+                        <option disabled value="">Vyber ceník</option>
+                        @foreach (var item in Enum.GetValues(typeof(Models.Mena)))
+                        {
+                            <option value="@item">@item</option>
+                        }
+                    </InputSelect>
+                    <label for="cena">Měna</label>
+
+                </div>
+            </div>
+
+            <div class="col col-xxl-2">
+                <div class="form-floating mb-2">
+                    <select class="form-select" @onchange="NactiCeny">
+
+                        @if (CenikyList != null)
+                        {
+                            <option disabled selected value="">Šablona</option>
+                            @foreach (var item in CenikyList)
+                            {
+                                <option value="@item.Id">@item.Nazev</option>
+                            }
+                        }
+                    </select>
+                    <label>Šablona</label>
+                </div>
+            </div>
+
+        </div>
+    <div class="row g-1 g-xxl-3">
+            <div class="col col-xxl-2">
+                <div class="form-floating mb-2">
+                    <InputNumber @bind-Value="Cenik.JelenI" class="form-control" />
+                    <label>Jelen kat. I</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.JelenII" />
+                    <label>Jelen kat. II</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.JelenIII" />
+                    <label>Jelen kat. III</label>
+                </div>
+            </div>
+            <div class="col col-xxl-2">
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.SrnciI" />
+                    <label>Srnec kat. I</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.SrnciII" />
+                    <label>Srnec kat. II</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.SrnciIII" />
+                    <label>Srnec kat. III</label>
+                </div>
+            </div>
+
+            <div class="col col-xxl-2">
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.MuflonI" />
+                    <label>Muflon kat. I</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.MuflonII" />
+                    <label>Muflon kat. II</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.MuflonIII" />
+                    <label>Muflon kat. III</label>
+                </div>
+            </div>
+        </div>
+
+    <div class="row g-1 g-xxl-3">
+            <div class="col col-xxl-2">
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.DanekI" />
+                    <label>Daněk kat. I</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.DanekII" />
+                    <label>Daněk kat. II</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.DanekIII" />
+                    <label>Daněk kat. III</label>
+                </div>
+            </div>
+            <div class="col col-xxl-2">
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.DivocakI" />
+                    <label>Divočák kat. I</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.DivocakII" />
+                    <label>Divočák kat. II</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.DivocakIII" />
+                    <label>Divočák kat. III</label>
+                </div>
+            </div>
+
+            <div class="col col-xxl-2">
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.SikaI" />
+                    <label>Sika kat. I</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.SikaII" />
+                    <label>Sika kat. II</label>
+                </div>
+                <div class="form-floating mb-2">
+                    <InputNumber class="form-control" @bind-Value="Cenik.SikaIII" />
+                    <label>Sika kat. III</label>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Ostatní vstupy formuláře -->
+
+        <button type="submit" class="btn btn-primary">Uložit</button>
+        <a href="/Dodavatele/Cenik" class="btn btn-secondary">Zpět</a>
+
+</EditForm>
+
+
+
+@code {
+    private Ceniky Cenik { get; set; } = new();
+    private List<Ceniky> CenikSablona { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private ConfirmDialog dialog = default!;
+
+    private string UserId { get; set; }
+
+    [Inject] protected ToastService ToastService { get; set; } = default!;
+
+    private List<(string Nazev, int Id)> CenikyList { get; set; }
+    [Inject] protected PreloadService PreloadService { get; set; } = default!;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            LoginServices login = new LoginServices(AuthenticationStateTask);
+            UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+            CenikyList = await CenikyController.GetCenikyAsync(UserId);
+            PreloadService.Hide();
+            StateHasChanged();
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        PreloadService.Show();
+    }
+
+    private async Task AddCenik()
+    {
+        bool succes = await CenikyController.CreateCenikAsync(UserId, Cenik);
+        if (succes)
+        {
+            NavigationManager.NavigateTo("/Dodavatele/Cenik");
+            ToastService.Notify(new(ToastType.Success, title: "Přidání ceníku", message: $"Ceník byl v pořádku přidán."));
+        }
+        else
+        {
+            ToastService.Notify(new(ToastType.Danger, title: "Přidání ceníku", message: $"Nastala chyba a ceník nebyl přidán."));
+        }
+    }
+
+    private void Validace(string chyba)
+    {
+        ToastService.Notify(new(ToastType.Danger, title: $"Upozornění", message: chyba));
+    }
+
+    public async Task NactiCeny(ChangeEventArgs e)
+    {
+        Cenik = await CenikyController.GetCenik(Convert.ToInt32(e.Value), UserId);
+        Cenik.Nazev = string.Empty;
+    }
+
+}

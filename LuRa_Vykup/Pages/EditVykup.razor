@@ -1,0 +1,213 @@
+﻿@using System.Diagnostics
+@inject VykupController VykupController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
+@inject PreloadService Preload
+
+@page "/Vykup/Seznam/Editovat/{id:int}/{previousPage}"
+
+<h5 class="mb-4">Editace výkupu</h5>
+
+@if (!string.IsNullOrEmpty(CisloDL))
+{
+    <Alert Color="AlertColor.Warning" Class="col-xl-6">
+        <Icon Name="IconName.ExclamationTriangleFill" class="me-2"></Icon>
+        Pozor - omezené možnosti editace!
+        <p>Editovaný kus se nachází v dokladu <strong>@CisloDL</strong>.</p>
+    </Alert>
+}
+
+<EditForm Model="@_vykupModel" OnValidSubmit="@UpdateVykup">
+   
+    <div class="row g-1 g-xxl-3">
+        <div class="col col-xxl-2">
+            <div class="form-floating mb-2">
+                <InputText @bind-Value="_vykupModel.Plomba" class="form-control" placeholder="09-123456" />
+                <label>@nameof(_vykupModel.Plomba)</label>
+            </div>
+        </div>
+        <div class="col col-xxl-2">
+            <div class="form-floating mb-2">
+                <InputNumber class="form-control" id="vahaLabel" placeholder="12,6" @bind-Value="_vykupModel.Vaha" disabled="@(!ReadyToSave)" />
+                <label>@nameof(_vykupModel.Vaha)</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-1 g-xxl-3">
+        <div class="col col-xxl-2">
+            <div class="form-floating mb-3">
+                <InputSelect @bind-Value="_vykupModel.Druh" class="form-select" disabled="@(!ReadyToSave)">
+
+                    <option selected disabled>Vyber druh zvěře</option>
+                    @foreach (var item in Enum.GetValues(typeof(DruhZvirete)))
+                    {
+                        <option value="@item">@item</option>
+                    }
+                </InputSelect>
+                <label>@nameof(_vykupModel.Druh)</label>
+            </div>
+        </div>
+
+        <div class="col col-xxl-2">
+            <div class="form-floating mb-3">
+                <InputSelect class="form-select" id="kategorieLabel" @bind-Value="_vykupModel.Kategorie" disabled="@(!ReadyToSave)">
+                    <option selected disabled>Vyber kategorii</option>
+                    @foreach (var item in Enum.GetValues(typeof(Kategorie)))
+                    {
+                        <option value="@item">@item</option>
+                    }
+                </InputSelect>
+                <label>@nameof(_vykupModel.Kategorie)</label>
+            </div>
+        </div>
+    </div>
+
+
+
+    <div class="row g-1 g-xxl-3">
+        <div class="col col-xxl-2">
+            <div class="form-floating mb-3">
+                <InputDate @bind-Value="_vykupModel.DatumVykupu" class="form-control" disabled="@(!ReadyToSave)" />
+                <label>Datum výkupu</label>
+            </div>
+        </div>
+        <div class="col col-xxl-2">
+            <div class="form-floating mb-3">
+                <InputSelect @bind-Value="_vykupModel.IdDodavatel" class="form-select" disabled="@(!ReadyToSave)">
+                    <option disabled value="-1">Vyber dodavatele</option>
+                    @foreach (var item in DodavateleNazvy)
+                    {
+                        <option value="@item.Id">@item.Nazev</option>
+                    }
+
+                </InputSelect>
+                <label>@nameof(_vykupModel.Dodavatele)</label>
+            </div>
+        </div>
+    </div>
+
+
+    <div class="row g-1 g-xxl-3">
+        <div class="col col-xxl-2">
+            <div class="form-floating mb-3">
+                <InputText @bind-Value="_vykupModel.CisloM" class="form-control" placeholder="M985214"></InputText>
+                <label>Prohližitel</label>
+            </div>
+        </div>
+    </div>
+
+    <ConfirmDialog @ref="dialog" />
+
+    <!-- Ostatní vstupy formuláře -->
+    <button type="submit" class="btn btn-primary">Uložit</button>
+    <button type="button" class="btn btn-secondary" @onclick="MyNavigate">Zpět</button>
+    <button type="button" class="btn btn-danger" @onclick="DeleteDialog">Vymazat</button>
+</EditForm>
+
+@code {
+    // je potreba pro logiku LoginServices
+    [Parameter]
+    public int Id { get; set; }
+
+    [Parameter]
+    public string PreviousPage { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+    private ConfirmDialog dialog = default!;
+    private List<(string Nazev, int Id)> DodavateleNazvy { get; set; } = new();
+    private string? UserId { get; set; }
+    Vykup _vykupModel = new();
+    private bool ReadyToSave { get; set; } = true;
+    private string CisloDL { get; set; } = string.Empty;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+    }
+
+    protected async override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _vykupModel = await VykupController.GetVykup(UserId, Id);
+            await NactiDodavatele();
+            if (_vykupModel.DodaciListId != null || _vykupModel.IdPokladniDoklad != null)
+            {
+                ReadyToSave = false;
+                CisloDL = _vykupModel.DodaciListId != null ? _vykupModel.DodaciListy.CisloDL : _vykupModel.PokladniDoklady.CisloDokladu;
+            }
+            StateHasChanged();
+            Preload.Hide();
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task UpdateVykup()
+    {
+        var result = await VykupController.UpdateVykupAsync(_vykupModel);
+        if (result)
+        {
+            MyNavigate();
+            ToastService.Notify(new(ToastType.Success, title: $"Aktualizace kusu {_vykupModel.Plomba}", message: $"Údaje byly aktualizovány."));
+        }
+        else
+            ToastService.Notify(new(ToastType.Danger, title: $"Aktualizace kusu {_vykupModel.Plomba}", message: $"Údaje nebyly aktualizovány."));
+    }
+
+    private async Task NactiDodavatele()
+    {
+        DodavateleNazvy = await VykupController.GetNazvyDodavatele(UserId);
+    }
+
+    private async Task DeleteDialog()
+    {
+        var confirmation = await dialog.ShowAsync(
+            title: "Smazání vykoupeného kusu",
+            message1: "Vážně chcete vykoupený kus smazat?",
+            confirmDialogOptions: new ConfirmDialogOptions()
+                {
+                    YesButtonColor = ButtonColor.Danger,
+                    YesButtonText = "Smazat",
+                    NoButtonColor = ButtonColor.Success,
+                    NoButtonText = "Zpět"
+                }
+        );
+
+        if (confirmation)
+        {
+            if (_vykupModel.DodaciListId != null)
+            {
+                ToastService.Notify(new(ToastType.Danger, title: $"Smazání vykoupeného kusu {_vykupModel.Plomba}", message: $"Vykoupený kus nelze smazat pokud je v dodacím listu."));
+                return;
+            }
+
+            Preload.Show();
+            bool success = await VykupController.DeleteVykupAsync(_vykupModel.Id);
+            if (success)
+            {
+                MyNavigate();
+                ToastService.Notify(new(ToastType.Success, title: $"Smazání vykoupeného kusu {_vykupModel.Plomba}", message: $"Vykoupený kus {_vykupModel.Plomba} byl v pořádku smazán."));
+            }
+            else
+            {
+                ToastService.Notify(new(ToastType.Danger, title: $"Smazání vykoupeného kusu {_vykupModel.Plomba}", message: $"Vykoupený kus {_vykupModel.Plomba} se nepodařilo smazat."));
+            }
+            Preload.Hide();
+        }
+    }
+
+    public void MyNavigate()
+    {
+        if (PreviousPage == "Vykup")
+            NavigationManager.NavigateTo($"/Vykup/Seznam/Pridat");
+        else
+            NavigationManager.NavigateTo($"/Vykup/SeznamFilter");
+    }
+}

@@ -1,0 +1,121 @@
+﻿@using LuRa_Vykup.Controllers
+@using LuRa_Vykup.Models
+@using LuRa_Vykup.ViewModels
+@using LuRa_Vykup.Services
+@using System.Diagnostics
+@inject VykupController VykupController
+@inject DLController DLController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject PreloadService Preload
+@inject ToastService ToastService
+
+@page "/Vykup/SeznamFilter"
+
+@HelperServices.GetGridFix()
+
+<div class="row">
+    <div class="col-12">
+        <Grid @ref="grid"
+              TItem="SeznamViewModel"
+              Class="table table-hover table-bordered table-striped table-sm"
+              DataProvider="DataLoad"
+              FiltersRowCssClass="bg-primary text-white bg-opacity-25 border-bottom-0 grid-border"
+              HeaderRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-50"
+              AllowFiltering="true"
+              AllowRowClick="true"
+              Responsive="true"
+              OnRowClick="Click"
+              EmptyText="Žádná data"
+              AllowPaging="true"
+              PageSize="15"
+              PageSizeSelectorVisible="true"
+              PageSizeSelectorItems="@(new int[] { 10,15,20,50,100 })"
+              PaginationItemsTextFormat="{0} - {1} z {2} položek"
+              ItemsPerPageText="Počet položek na stránku"
+              FiltersTranslationProvider="HelperServices.PrekladFilter"
+              >
+            
+            <GridColumn TItem="SeznamViewModel" HeaderText="Plomba" PropertyName="Plomba">
+                @context.Plomba
+            </GridColumn>
+            <GridColumn TItem="SeznamViewModel" HeaderText="Druh" PropertyName="Druh">
+                @context.Druh
+            </GridColumn>
+            <GridColumn TItem="SeznamViewModel" HeaderText="Váha" PropertyName="Vaha" TextAlignment="Alignment.End">
+                @context.Vaha
+            </GridColumn>
+            <GridColumn TItem="SeznamViewModel" HeaderText="Kategorie" PropertyName="Kategorie">
+                @context.Kategorie
+            </GridColumn>
+            <GridColumn TItem="SeznamViewModel" HeaderText="Datum výkupu" PropertyName="DatumVykupu">
+                @context.DatumVykupu
+            </GridColumn>
+            <GridColumn TItem="SeznamViewModel" HeaderText="Dodavatel" PropertyName="Dodavatel">
+                @context.Dodavatel
+            </GridColumn>
+            <GridColumn TItem="SeznamViewModel" HeaderText="Doklad" PropertyName="Doklad">
+                @context.Doklad
+            </GridColumn>
+        </Grid>
+    </div>
+</div>
+
+
+
+@code {
+    // je potreba pro logiku LoginServices
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private List<SeznamViewModel> VykupList { get; set; }
+    private List<Vykup> FirstList { get; set; }
+    private string? UserId { get; set; }
+    BlazorBootstrap.Grid<SeznamViewModel> grid = default!;
+
+    private async Task<GridDataProviderResult<SeznamViewModel>> DataLoad(GridDataProviderRequest<SeznamViewModel> request)
+    {
+        if (VykupList is null)
+            FirstList = await VykupController.GetVykupPage(UserId);
+        VykupList = FirstList.Select(x => new SeznamViewModel //nutne pretypovani kvuli debilnimu enemu pro filtraci
+            {
+                Plomba = x.Plomba,
+                Druh = x.Druh.ToString(),
+                Dodavatel = x.Dodavatele.Dodavatel,
+                DatumVykupu = DateOnly.FromDateTime(x.DatumVykupu),
+                Id = x.Id,
+                Vaha = x.Vaha.ToString(),
+                Kategorie = x.Kategorie.ToString(),
+                DodaciListId = x.DodaciListId,
+               // DodaciListCislo = x.DodaciListy?.CisloDL,
+                Doklad = x.DodaciListy?.CisloDL != null ? x.DodaciListy.CisloDL : (x.PokladniDoklady?.CisloDokladu != null ? x.PokladniDoklady.CisloDokladu : string.Empty)
+                
+            }).ToList();
+
+
+        Preload.Hide();
+        return await Task.FromResult(request.ApplyTo(VykupList));
+    }
+
+    protected async override Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+    }
+
+    private async Task Click(GridRowEventArgs<SeznamViewModel> args)
+    {
+        NavigationManager.NavigateTo($"/Vykup/Seznam/Editovat/{@args.Item.Id}/Seznam");
+    }
+   
+}

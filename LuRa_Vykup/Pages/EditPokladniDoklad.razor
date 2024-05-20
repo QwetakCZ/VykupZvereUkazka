@@ -1,0 +1,294 @@
+﻿@inject PokladniDokladyController PDController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
+@inject PreloadService Preload
+
+@page "/PokladniDoklady/EditPokladniDoklad/{IdDokladu:int}"
+
+<div class="row">
+    <div class="col-9">
+        <Grid TItem="Vykup"
+              @ref="grid"
+              Class="table table-hover table-bordered"
+              DataProvider="DataLoading"
+              AllowSelection="true"
+              SelectionMode="GridSelectionMode.Multiple"
+              SelectedItemsChanged="OnSelectedItemsChanged"
+              FixedHeader="true"
+              Height="700"
+              RowClass="GetRowClass"
+              Unit="Unit.Px"
+              Responsive="true">
+
+            <GridColumn TItem="Vykup" HeaderText="Plomba" PropertyName="Plomba">
+                @context.Plomba
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Druh" PropertyName="Druh">
+                @context.Druh
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Kategorie" PropertyName="Kategorie">
+                @context.Kategorie
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="DatumVykupu" PropertyName="DatumVykupu">
+                @context.DatumVykupu.ToShortDateString()
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Cena kg" PropertyName="CenaKgPrepocet" TextAlignment="Alignment.End" HeaderTextAlignment="Alignment.End">
+                @(context.CenaKgPokladniDoklad.HasValue ? context.CenaKgPokladniDoklad.Value.ToString("N2") : "0")
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Cena Celkem" PropertyName="CenaCelkem" TextAlignment="Alignment.End" HeaderTextAlignment="Alignment.End">
+                @GetCena(context.Vaha, context.CenaKgPokladniDoklad ?? 0)
+            </GridColumn>
+
+        </Grid>
+
+
+    </div>
+
+
+    @if (PDList != null)
+    {
+        <div class="col-3">
+            <div class="border p-2 h-100 overflow-auto @GetBorderColor" style="max-height:700px">
+
+                <div class="d-flex">
+                    <button class="btn btn-sm btn-success flex-fill me-2 @GetDisabledUlozit" @onclick="() => DeleteDialog(1)">Smazat a uložit</button>
+                    <a class="btn btn-sm btn-secondary flex-fill mx-2" href="/Dodaci_listy/PokladniDokladySeznam">Zpět</a>
+                    <button class="btn btn-sm btn-warning flex-fill ms-2" @onclick="OnShowOffcanvasClick">Info</button>
+                </div>
+
+                <div class="fw-bold">
+                    @PDList.FirstOrDefault().Dodavatele.Dodavatel
+                </div>
+                <div class="fw-bold">
+                    @PDList.FirstOrDefault().PokladniDoklady.CisloDokladu
+                </div>
+                <div class="">
+                    Počet: @PDList.Count
+                </div>
+                <div class="bg-opacity-50 @GetBackgroudColor">
+                    <strong>Cena celkem: @CelkemCena.ToString("N2") @PDList.Select(x => x.Dodavatele.Ceniky.Mena).FirstOrDefault().ToString() </strong>
+                </div>
+
+                <div class="mt-2">
+                    <ul class="list-group">
+                        @foreach (var item in PDList)
+                        {
+                            <li class="list-group-item d-flex justify-content-between align-items-center p-1">
+                                @item.Plomba
+                                <span class="">@(Math.Round(item.Vaha * item.CenaKgPokladniDoklad ?? 0, 2).ToString("N2"))</span>
+                            </li>
+                        }
+                    </ul>
+                </div>
+                <div class="d-flex mt-2">
+                    <button class="btn btn-sm btn-danger flex-fill me-2 @GetDisabled" @onclick="PripravitKeSmazani">Smazat vybrané kusy</button>
+                    <Tooltip Color="TooltipColor.Primary" Title="Smaže celý doklad bez možnosti návratu!" role="button">
+                        <button class="btn btn-sm btn-danger flex-fill me-2 " @onclick="()=> DeleteDialog(2)">Smazat doklad</button>
+                    </Tooltip>
+                </div>
+                <div class="">
+                    Počet ke smazání: @PDListKeSmazani?.Count
+                </div>
+                <ul class="list-group">
+                    @foreach (var item in PDListKeSmazani)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center p-1">
+                            @item.Plomba
+                            <a class="me-2 badge bg-primary btn" @onclick="() => VratitZpet(item.Id)">Vrátit</a>
+                        </li>
+                    }
+                </ul>
+            </div>
+
+        </div>
+    }
+</div>
+
+<Offcanvas @ref="offcanvas" Title="Informace" Size="OffcanvasSize.Large">
+    <BodyTemplate>
+        <strong>Tabulka</strong>
+        <p>Můžete pouze odebrat kus z pokladního dokladu.</p>
+        <p><strong>Postup:</strong> Označte kusy, které chcete odebrat a klikněte v pravo na tlačítko "Smazat vybrané". Kusy se označí ke smazání. Poté stačí pouze doklad uložit.</p>
+        <p>Ještě před uložením vydíte aktualizovanou cenu a obsah dokladu.</p>
+        <strong>Funkce</strong>
+        <p>Doklad můžete smazat celý pomocí tlačítka "Smazat doklad"</p>
+
+    </BodyTemplate>
+</Offcanvas>
+
+<ConfirmDialog @ref="dialog" />
+
+
+
+@code {
+    // je potreba pro logiku LoginServices
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+    [Parameter]
+    public int IdDokladu { get; set; }
+    private ConfirmDialog dialog = default!;
+    private List<Vykup> PDList { get; set; }
+    private List<Vykup>? PDListKeSmazani { get; set; } = new();
+    private HashSet<Vykup> vybranePlomby = new();
+    private string? UserId { get; set; }
+    Grid<Vykup> grid;
+    private decimal CelkemCena { get; set; }
+    private Mena Mena { get; set; } = Mena.CZK;
+    private Offcanvas offcanvas;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+    }
+
+    private int GetMena(bool cena = true)
+    {
+        if (Mena == Mena.CZK)
+        {
+            if (cena)
+                return 10000;
+            else 
+                return 8000;
+        }
+        if (cena)
+            return 1000;
+        else
+            return 800;
+    }
+
+    public string GetBackgroudColor => (CelkemCena > GetMena()) ? "bg-danger" : CelkemCena > GetMena(false) ? "bg-warning" : "bg-success";
+    public string GetBorderColor => (CelkemCena > GetMena()) ? "border-danger border-3" : "border-success border-1";
+    public string GetDisabled => (vybranePlomby.Count > 0 && vybranePlomby.Count != PDList.Count) ? "" : "disabled";
+    public string GetDisabledUlozit => (PDListKeSmazani?.Count > 0) ? "" : "disabled";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Preload.Hide();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+    private async Task PripravitKeSmazani()
+    {
+        vybranePlomby.ToList().ForEach(x => PDListKeSmazani.Add(x));
+        vybranePlomby.ToList().ForEach(x => PDList.Remove(x));
+        await grid.RefreshDataAsync();
+    }
+
+    private async Task VratitZpet(int id)
+    {
+        PDList.Add(PDListKeSmazani.FirstOrDefault(x => x.Id == id));
+        PDListKeSmazani.RemoveAll(x => x.Id == id);
+        await grid.RefreshDataAsync();
+    }
+
+    public string GetCena(decimal vaha, decimal cenaKg)
+    {
+        return Math.Round(vaha * cenaKg, 2).ToString("N2");
+    }
+
+    private Task OnSelectedItemsChanged(HashSet<Vykup> PDList)
+    {
+        vybranePlomby = PDList is not null && PDList.Any() ? PDList : new();
+        return Task.CompletedTask;
+    }
+
+    private async Task<GridDataProviderResult<Vykup>> DataLoading(GridDataProviderRequest<Vykup> request)
+    {
+        if (PDList is null)
+            PDList = await PDController.GetPokladnidokladySeznamDoklad(UserId, IdDokladu);
+
+        CelkemCena = Math.Round(PDList.Sum(x => x.Vaha * x.CenaKgPokladniDoklad ?? 0), 2);
+        Mena = PDList.FirstOrDefault().Dodavatele.Ceniky.Mena;
+        StateHasChanged();
+        return await Task.FromResult(request.ApplyTo(PDList));
+    }
+
+    private string GetRowClass(Vykup data)
+    {
+        if (vybranePlomby.Any(x => x.Id == data.Id))
+            return "table-danger";
+        return string.Empty;
+    }
+
+    private async Task OnShowOffcanvasClick()
+    {
+        await offcanvas?.ShowAsync();
+    }
+
+    private async Task UlozitDoklad()
+    {
+        Preload.Show(loadingText: "Upravuji...");
+
+        bool result = await PDController.SaveAndDeletePokladniDoklad(PDListKeSmazani, UserId);
+
+        if (result)
+        {
+            NavigationManager.NavigateTo("/Dodaci_listy/PokladniDokladySeznam");
+            ToastService.Notify(new(ToastType.Success, title: $"Pokladní doklad {HelperServices.NewPDNumber}", message: $"Pokladní doklad byl v pořádku uložen."));
+        }
+        else
+        {
+            ToastService.Notify(new(ToastType.Danger, title: $"Pokladní doklad {HelperServices.NewPDNumber}", message: $"Pokladní doklad nebyl v pořádku uložen."));
+        }
+        Preload.Hide();
+    }
+
+    private async Task SmazatDoklad()
+    {
+        Preload.Show(loadingText: "Mažu...");
+        bool result = await PDController.SmazatDoklad(IdDokladu, PDList);
+        if(result){
+            NavigationManager.NavigateTo("/Dodaci_listy/PokladniDokladySeznam");
+            ToastService.Notify(new(ToastType.Success, title: $"Pokladní doklad {HelperServices.NewPDNumber}", message: $"Pokladní doklad byl v pořádku smazán."));
+        }
+        else
+        {
+            ToastService.Notify(new(ToastType.Danger, title: $"Pokladní doklad {HelperServices.NewPDNumber}", message: $"Pokladní doklad nebyl v pořádku smazán."));
+        }
+        Preload.Hide();
+    }
+
+    private async Task DeleteDialog(int id)
+    {
+        var confirmation = await dialog.ShowAsync(
+            title: "Smazání pokladního dokladu",
+            message1: "Vážně chcete smazat data z pokladního dokladu?",
+            confirmDialogOptions: new ConfirmDialogOptions()
+                {
+                    YesButtonColor = ButtonColor.Danger,
+                    YesButtonText = "Smazat",
+                    NoButtonColor = ButtonColor.Success,
+                    NoButtonText = "Zpět"
+                }
+        );
+
+        if (confirmation)
+        {
+            switch (id)
+            {
+                case 1:
+                    await UlozitDoklad();
+                    break;
+                case 2:
+                    await SmazatDoklad();
+                    break;
+            }
+        }
+    }
+
+
+}

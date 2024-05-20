@@ -1,0 +1,249 @@
+﻿@inject DLController DLController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
+@inject PreloadService Preload
+@inject TracesController TracesController
+
+@page "/Traces/EditTraces/{Id:int}"
+
+<div class="row">
+    <div class="col-9">
+        <Grid TItem="Vykup"
+              @ref="grid"
+              Class="table table-hover table-bordered"
+              DataProvider="DataLoading"
+              AllowSelection="true"
+              SelectionMode="GridSelectionMode.Multiple"
+              SelectedItemsChanged="OnSelectedItemsChanged"
+              FixedHeader="true"
+              Height="700"
+              RowClass="GetRowClass"
+              Unit="Unit.Px"
+              Responsive="true">
+
+            <GridColumn TItem="Vykup" HeaderText="Plomba" PropertyName="Plomba">
+                @context.Plomba
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Druh" PropertyName="Druh">
+                @context.Druh
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Kategorie" PropertyName="Kategorie">
+                @context.Kategorie
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Datum Výkupu" PropertyName="DatumVykupu">
+                @context.DatumVykupu.ToShortDateString()
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Dodavatel" PropertyName="IdDodavatel" TextAlignment="Alignment.End" HeaderTextAlignment="Alignment.End">
+                @context.Dodavatele.Dodavatel
+            </GridColumn>
+
+
+
+        </Grid>
+
+
+    </div>
+
+    @if (TracerList != null)
+    {
+        <div class="col-3">
+            <div class="border p-2 h-100 overflow-auto" style="max-height:700px">
+
+                <div class="d-flex">
+                    <button class="btn btn-sm btn-success flex-fill me-2 @GetDisabledUlozit" @onclick="() => DeleteDialog(1)">Smazat a uložit</button>
+                    <a class="btn btn-sm btn-secondary flex-fill mx-2" href="/Traces/TracesSeznam">Zpět</a>
+                    <button class="btn btn-sm btn-warning flex-fill ms-2" @onclick="OnShowOffcanvasClick">Info</button>
+                </div>
+
+                <div class="fw-bold">
+                    @DodavatelNazev
+                </div>
+                <div class="fw-bold">
+                    @CisloTracers
+                </div>
+                <div class="">
+                    Počet: @TracerList.Count
+                </div>
+
+                <div class="mt-2">
+                    <ul class="list-group">
+                        @foreach (var item in TracerList)
+                        {
+                            <li class="list-group-item p-1">
+                                @item.Plomba
+                            </li>
+                        }
+                    </ul>
+                </div>
+
+                <div class="d-flex mt-2">
+                    <button class="btn btn-sm btn-danger flex-fill me-2 @GetDisabled" @onclick="PripravitKeSmazani">Smazat vybrané kusy</button>
+                    <Tooltip Color="TooltipColor.Primary" Title="Smaže celý doklad bez možnosti návratu!" role="button">
+                        <button class="btn btn-sm btn-danger flex-fill me-2 " @onclick="()=> DeleteDialog(2)">Smazat doklad</button>
+                    </Tooltip>
+                </div>
+                <div class="">
+                    Počet ke smazání: @TracerListKeSmazani?.Count
+                </div>
+                <ul class="list-group">
+                    @foreach (var item in TracerListKeSmazani)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center p-1">
+                            @item.Plomba
+                            <a class="me-2 badge bg-primary btn" @onclick="() => VratitZpet(item.Id)">Vrátit</a>
+                        </li>
+                    }
+                </ul>
+            </div>
+
+        </div>
+    }
+</div>
+
+<Offcanvas @ref="offcanvas" Title="Informace" Size="OffcanvasSize.Large">
+    <BodyTemplate>
+        <strong>Tabulka</strong>
+        <p>Můžete pouze odebrat kus z Traces listu.</p>
+        <p><strong>Postup:</strong> Označte kusy, které chcete odebrat a klikněte v pravo na tlačítko "Smazat vybrané". Kusy se označí ke smazání. Poté stačí pouze doklad uložit.</p>
+        <p>Ještě před uložením vydíte aktualizovany obsah dokladu.</p>
+        <strong>Funkce</strong>
+        <p>Doklad můžete smazat celý pomocí tlačítka "Smazat doklad"</p>
+    </BodyTemplate>
+</Offcanvas>
+
+<ConfirmDialog @ref="dialog" />
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private ConfirmDialog dialog = default!;
+    private List<Vykup> TracerList { get; set; }
+    private List<Vykup>? TracerListKeSmazani { get; set; } = new();
+    private HashSet<Vykup> vybranePlomby = new();
+    private string? UserId { get; set; }
+    Grid<Vykup> grid;
+    private Offcanvas offcanvas;
+
+    private string DodavatelNazev { get; set; } = string.Empty;
+    private string CisloTracers { get; set; } = string.Empty;
+
+    public string GetDisabled => (vybranePlomby.Count > 0 && vybranePlomby.Count != TracerList.Count) ? "" : "disabled";
+    public string GetDisabledUlozit => (TracerListKeSmazani?.Count > 0) ? "" : "disabled";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+    }
+
+    private async Task PripravitKeSmazani()
+    {
+        vybranePlomby.ToList().ForEach(x => TracerListKeSmazani.Add(x));
+        vybranePlomby.ToList().ForEach(x => TracerList.Remove(x));
+        await grid.RefreshDataAsync();
+    }
+
+    private async Task VratitZpet(int id)
+    {
+        TracerList.Add(TracerListKeSmazani.FirstOrDefault(x => x.Id == id));
+        TracerListKeSmazani.RemoveAll(x => x.Id == id);
+        await grid.RefreshDataAsync();
+    }
+
+    private Task OnSelectedItemsChanged(HashSet<Vykup> tracerList)
+    {
+        vybranePlomby = tracerList is not null && tracerList.Any() ? tracerList : new();
+        return Task.CompletedTask;
+    }
+
+    private async Task<GridDataProviderResult<Vykup>> DataLoading(GridDataProviderRequest<Vykup> request)
+    {
+        if (TracerList is null)
+        {
+            TracerList = await TracesController.GetPolozkyTracers(UserId, Id);
+            CisloTracers = TracerList.FirstOrDefault().Traces.CisloTraces;
+        }
+        StateHasChanged();
+        Preload.Hide();
+        return await Task.FromResult(request.ApplyTo(TracerList));
+    }
+
+    private string GetRowClass(Vykup data)
+    {
+        if (vybranePlomby.Any(x => x.Id == data.Id))
+            return "table-danger";
+        return string.Empty;
+    }
+
+    private async Task OnShowOffcanvasClick()
+    {
+        await offcanvas?.ShowAsync();
+    }
+
+    private async Task UlozitDoklad()
+    {
+        Preload.Show(loadingText: "Upravuji...");
+        bool result = await TracesController.SaveAndDeleteTracesList(TracerListKeSmazani, UserId);
+        await InformujNaviguj(result);
+    }
+
+    private async Task SmazatDoklad()
+    {
+        Preload.Show(loadingText: "Mažu...");
+        bool result = await TracesController.SmazatDoklad(Id);
+        await InformujNaviguj(result);
+    }
+
+    private async Task InformujNaviguj(bool result)
+    {
+        if (result)
+        {
+            NavigationManager.NavigateTo("/Traces/TracesSeznam");
+            ToastService.Notify(new(ToastType.Success, title: $"Traces doklad {HelperServices.NewTracesNumber}", message: $"Traces doklad byl v pořádku smazán."));
+        }
+        else
+        {
+            ToastService.Notify(new(ToastType.Danger, title: $"Traces doklad {HelperServices.NewTracesNumber}", message: $"Traces doklad nebyl v pořádku smazán."));
+        }
+        Preload.Hide();
+    }
+
+    private async Task DeleteDialog(int id)
+    {
+        var confirmation = await dialog.ShowAsync(
+            title: "Smazání Traces listu",
+            message1: "Vážně chcete smazat data z Traces listu?",
+            confirmDialogOptions: new ConfirmDialogOptions()
+                {
+                    YesButtonColor = ButtonColor.Danger,
+                    YesButtonText = "Smazat",
+                    NoButtonColor = ButtonColor.Success,
+                    NoButtonText = "Zpět"
+                }
+        );
+
+        if (confirmation)
+        {
+            switch (id)
+            {
+                case 1:
+                    await UlozitDoklad();
+                    break;
+                case 2:
+                    await SmazatDoklad();
+                    break;
+            }
+        }
+    }
+
+}

@@ -1,0 +1,86 @@
+﻿@using LuRa_Vykup.Controllers
+@using LuRa_Vykup.Services
+@inject CenikyController CenikyController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject PreloadService Preload
+
+@page "/Dodavatele/Cenik"
+
+<a href="/Dodavatele/Cenik/Pridej" class="btn btn-primary mb-2">
+    Přidat ceník
+</a>
+<div class="row">
+    <div class="col-md-12">
+
+        @HelperServices.GetGridFix()
+        <div class="row">
+            <div class="col-12">
+                <Grid @ref="grid"
+                      TItem="CenikyListSeznamViewModel"
+                      Class="table table-hover table-bordered table-striped table-sm"
+                      DataProvider="DataLoad"
+                      FiltersRowCssClass="bg-primary text-white bg-opacity-25 border-bottom-0 grid-border"
+                      HeaderRowCssClass="bg-primary text-white border-bottom-0 bg-opacity-50"
+                      AllowFiltering="true"
+                      AllowRowClick="true"
+                      Responsive="true"
+                      OnRowClick="Click"
+                      EmptyText="Žádná data"
+                      AllowPaging="true"
+                      PageSize="15"
+                      PageSizeSelectorVisible="true"
+                      PageSizeSelectorItems="@(new int[] { 10,15,20,50,100 })"
+                      PaginationItemsTextFormat="{0} - {1} z {2} položek"
+                      ItemsPerPageText="Počet položek na stránku"
+                      FiltersTranslationProvider="HelperServices.PrekladFilter">
+
+                    <GridColumn TItem="CenikyListSeznamViewModel" HeaderText="Název" PropertyName="Nazev">
+                        @context.Nazev
+                    </GridColumn>
+                    <GridColumn TItem="CenikyListSeznamViewModel" HeaderText="Měna" PropertyName="MenaString">
+                        @context.MenaString
+                    </GridColumn>
+
+                </Grid>
+            </div>
+        </div>
+    </div>
+</div>
+@code {
+
+    // je potreba pro logiku LoginServices
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private List<CenikyListSeznamViewModel> CenikyList { get; set; }
+    private string? UserId { get; set; }
+    BlazorBootstrap.Grid<CenikyListSeznamViewModel> grid = default!;
+
+    private async Task<GridDataProviderResult<CenikyListSeznamViewModel>> DataLoad(GridDataProviderRequest<CenikyListSeznamViewModel> request)
+    {
+        if (CenikyList is null)
+        {
+            var data = await CenikyController.GetCenikyList(UserId);
+            CenikyList = data.Select(x => new CenikyListSeznamViewModel(x)).ToList();
+        }
+        Preload.Hide();
+        return await Task.FromResult(request.ApplyTo(CenikyList));
+    }
+
+    private async Task Click(GridRowEventArgs<CenikyListSeznamViewModel> args)
+    {
+        NavigationManager.NavigateTo($"/Dodavatele/Cenik/Edit/{args.Item.Id}");
+    }
+
+    /// </summary>
+    /// <returns></returns>
+    protected override async Task OnInitializedAsync()
+    {
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+    }
+}
+
+

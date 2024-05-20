@@ -1,0 +1,123 @@
+﻿@using LuRa_Vykup.Controllers
+@using LuRa_Vykup.Services
+@using Microsoft.AspNetCore.Mvc.ViewFeatures
+@using System.ComponentModel.DataAnnotations;
+@using System.ComponentModel.DataAnnotations.Schema;
+@inject DodavateleController DodavateleController
+@inject CenikyController CenikyController
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
+@inject PreloadService Preload
+
+@page "/Dodavatele/Seznam/Pridej"
+
+
+
+<EditForm Model="@Dodavatel" OnValidSubmit="@AddDodavatel">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+
+    <h5 class="mb-4">Nový dodavatel</h5>
+    
+    <div class="row my-2">
+        <div class="col col-xxl-2">
+            <div class="form-floating">
+                <InputText @bind-Value="Dodavatel.Dodavatel" class="form-control" placeholder="." />
+                <label>@nameof(Dodavatel.Dodavatel)</label>
+            </div>
+        </div>
+
+        <div class="col col-xxl-2">
+            <div class="form-floating ">
+                <InputText @bind-Value="Dodavatel.CisloM" class="form-control" placeholder="." />
+                <label>@nameof(Dodavatel.CisloM)</label>
+            </div>
+        </div>
+    </div>
+    <div class="row my-2">
+
+        <div class="col col-xxl-2">
+            <div class="form-floating ">
+                <InputText @bind-Value="Dodavatel.Telefon" class="form-control" placeholder="." />
+                <label>@nameof(Dodavatel.Telefon)</label>
+            </div>
+        </div>
+
+        <div class="col col-xxl-2">
+            <div class="form-floating ">
+                <InputText @bind-Value="Dodavatel.Email" class="form-control" placeholder="." />
+                <label>@nameof(Dodavatel.Email)</label>
+            </div>
+        </div>
+    </div>
+
+    <div class="row my-2">
+        <div class="col col-lg-6 col-xxl-2">
+            <div class="form-floating ">
+                <InputSelect @bind-Value="Dodavatel.CenikId" class="form-select">
+                    <option disabled value="">Vyber ceník</option>
+                    @foreach (var item in CenikyList)
+                    {
+                        <option value="@item.Id">@item.Nazev</option>
+                    }
+
+                </InputSelect>
+
+                <label>Ceník</label>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ostatní vstupy formuláře -->
+
+    <button type="submit" class="btn btn-primary">Uložit</button>
+    <a href="/Dodavatele/Seznam" class="btn btn-secondary">Zpět</a>
+
+</EditForm>
+@code {
+    private Models.Dodavatele? Dodavatel { get; set; } = new();
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+
+    private string UserId { get; set; }
+    private List<(string Nazev, int Id)> CenikyList { get; set; } = new();
+
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            CenikyList = await CenikyController.GetCenikyNazvy(UserId);
+            Dodavatel.CenikId = CenikyList[0].Id;
+            StateHasChanged();
+            Preload.Hide();
+        }
+
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+        
+    }
+
+    private async Task AddDodavatel()
+    {
+        bool succes = await DodavateleController.CreateDodavateleAsync(UserId, Dodavatel);
+        if (succes)
+        {
+            NavigationManager.NavigateTo("/Dodavatele/Seznam");
+            ToastService.Notify(new(ToastType.Success, title: "Přidání dodavatele", message: $"Dodavatel byl v pořádku přidán."));
+        }
+        else
+        {
+            ToastService.Notify(new(ToastType.Danger, title: "Přidání dodavatele", message: $"Nastala chyba a dodavatel nebyl přidán."));
+        }
+    }
+}

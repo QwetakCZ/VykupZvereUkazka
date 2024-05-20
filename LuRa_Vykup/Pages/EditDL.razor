@@ -1,0 +1,247 @@
+﻿@inject DLController DLController
+@inject AuthenticationStateProvider _authenticationStateProvider
+@inject NavigationManager NavigationManager
+@inject ToastService ToastService
+@inject PreloadService Preload
+
+@page "/Dodaci_listy/Editovat/{Id:int}"
+
+<div class="row">
+    <div class="col-9">
+        <Grid TItem="Vykup"
+              @ref="grid"
+              Class="table table-hover table-bordered"
+              DataProvider="DataLoading"
+              AllowSelection="true"
+              SelectionMode="GridSelectionMode.Multiple"
+              SelectedItemsChanged="OnSelectedItemsChanged"
+              FixedHeader="true"
+              Height="700"
+              RowClass="GetRowClass"
+              Unit="Unit.Px"
+              Responsive="true">
+
+            <GridColumn TItem="Vykup" HeaderText="Plomba" PropertyName="Plomba">
+                @context.Plomba
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Váha" PropertyName="Vaha">
+                @context.Vaha
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Druh" PropertyName="Druh">
+                @context.Druh
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="Kategorie" PropertyName="Kategorie">
+                @context.Kategorie
+            </GridColumn>
+
+            <GridColumn TItem="Vykup" HeaderText="DatumVykupu" PropertyName="DatumVykupu">
+                @context.DatumVykupu.ToShortDateString()
+            </GridColumn>
+
+        </Grid>
+
+
+    </div>
+
+    @if (DLList != null)
+    {
+        <div class="col-3">
+            <div class="border p-2 h-100 overflow-auto" style="max-height:700px">
+
+                <div class="d-flex">
+                    <button class="btn btn-sm btn-success flex-fill me-2 @GetDisabledUlozit" @onclick="() => DeleteDialog(1)">Smazat a uložit</button>
+                    <a class="btn btn-sm btn-secondary flex-fill mx-2" href="/Dodaci_listy/Seznam">Zpět</a>
+                    <button class="btn btn-sm btn-warning flex-fill ms-2" @onclick="OnShowOffcanvasClick">Info</button>
+                </div>
+
+                <div class="fw-bold">
+                    @DodavatelNazev
+                </div>
+                <div class="fw-bold">
+                    @CisloDL
+                </div>
+                <div class="">
+                    Počet: @DLList.Count
+                </div>
+
+                <div class="mt-2">
+                    <ul class="list-group">
+                        @foreach (var item in DLList)
+                        {
+                            <li class="list-group-item p-1">
+                                @item.Plomba
+                            </li>
+                        }
+                    </ul>
+                </div>
+
+                <div class="d-flex mt-2">
+                    <button class="btn btn-sm btn-danger flex-fill me-2 @GetDisabled" @onclick="PripravitKeSmazani">Smazat vybrané kusy</button>
+                    <Tooltip Color="TooltipColor.Primary" Title="Smaže celý doklad bez možnosti návratu!" role="button">
+                        <button class="btn btn-sm btn-danger flex-fill me-2 " @onclick="()=> DeleteDialog(2)">Smazat doklad</button>
+                    </Tooltip>
+                </div>
+                <div class="">
+                    Počet ke smazání: @DLListKeSmazani?.Count
+                </div>
+                <ul class="list-group">
+                    @foreach (var item in DLListKeSmazani)
+                    {
+                        <li class="list-group-item d-flex justify-content-between align-items-center p-1">
+                            @item.Plomba
+                            <a class="me-2 badge bg-primary btn" @onclick="() => VratitZpet(item.Id)">Vrátit</a>
+                        </li>
+                    }
+                </ul>
+            </div>
+
+        </div>
+    }
+</div>
+
+<Offcanvas @ref="offcanvas" Title="Informace" Size="OffcanvasSize.Large">
+    <BodyTemplate>
+        <strong>Tabulka</strong>
+        <p>Můžete pouze odebrat kus z dodacího listu.</p>
+        <p><strong>Postup:</strong> Označte kusy, které chcete odebrat a klikněte v pravo na tlačítko "Smazat vybrané". Kusy se označí ke smazání. Poté stačí pouze doklad uložit.</p>
+        <p>Ještě před uložením vydíte aktualizovanou cenu a obsah dokladu.</p>
+        <strong>Funkce</strong>
+        <p>Doklad můžete smazat celý pomocí tlačítka "Smazat doklad"</p>
+    </BodyTemplate>
+</Offcanvas>
+
+<ConfirmDialog @ref="dialog" />
+
+@code {
+    [Parameter]
+    public int Id { get; set; }
+
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthenticationStateTask { get; set; }
+    private ConfirmDialog dialog = default!;
+    private List<Vykup> DLList { get; set; }
+    private List<Vykup>? DLListKeSmazani { get; set; } = new();
+    private HashSet<Vykup> vybranePlomby = new();
+    private string? UserId { get; set; }
+    Grid<Vykup> grid;
+    private Offcanvas offcanvas;
+
+    private string DodavatelNazev { get; set; } = string.Empty;
+    private string CisloDL { get; set; } = string.Empty;
+
+    public string GetDisabled => (vybranePlomby.Count > 0 && vybranePlomby.Count != DLList.Count) ? "" : "disabled";
+    public string GetDisabledUlozit => (DLListKeSmazani?.Count > 0) ? "" : "disabled";
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Zkontroluje prihlaseni, obsahuje metody GetUserId a GetUserName, udelal jsme tridu pro lepsi logiku
+        LoginServices login = new LoginServices(AuthenticationStateTask);
+        UserId = login.GetUserId((fc) => { if (fc) NavigationManager.NavigateTo("/identity/account/login"); });
+        Preload.Show();
+    }
+
+    private async Task PripravitKeSmazani()
+    {
+        vybranePlomby.ToList().ForEach(x => DLListKeSmazani.Add(x));
+        vybranePlomby.ToList().ForEach(x => DLList.Remove(x));
+        await grid.RefreshDataAsync();
+    }
+
+    private async Task VratitZpet(int id)
+    {
+        DLList.Add(DLListKeSmazani.FirstOrDefault(x => x.Id == id));
+        DLListKeSmazani.RemoveAll(x => x.Id == id);
+        await grid.RefreshDataAsync();
+    }
+
+    private Task OnSelectedItemsChanged(HashSet<Vykup> PDList)
+    {
+        vybranePlomby = PDList is not null && PDList.Any() ? PDList : new();
+        return Task.CompletedTask;
+    }
+
+    private async Task<GridDataProviderResult<Vykup>> DataLoading(GridDataProviderRequest<Vykup> request)
+    {
+        if (DLList is null)
+        {
+            DLList = await DLController.GetPolozkyDL(UserId, Id);
+            DodavatelNazev = DLList.FirstOrDefault().Dodavatele.Dodavatel;
+            CisloDL = DLList.FirstOrDefault().DodaciListy.CisloDL;
+        }
+        StateHasChanged();
+        Preload.Hide();
+        return await Task.FromResult(request.ApplyTo(DLList));
+    }
+
+    private string GetRowClass(Vykup data)
+    {
+        if (vybranePlomby.Any(x => x.Id == data.Id))
+            return "table-danger";
+        return string.Empty;
+    }
+
+    private async Task OnShowOffcanvasClick()
+    {
+        await offcanvas?.ShowAsync();
+    }
+
+    private async Task UlozitDoklad()
+    {
+        Preload.Show(loadingText: "Upravuji...");
+        bool result = await DLController.SaveAndDeleteDodaciList(DLListKeSmazani, UserId);
+        await InformujNaviguj(result);
+    }
+
+    private async Task SmazatDoklad()
+    {
+        Preload.Show(loadingText: "Mažu...");
+        bool result = await DLController.SmazatDoklad(Id, DLList);
+        await InformujNaviguj(result);
+    }
+
+    private async Task InformujNaviguj(bool result)
+    {
+        if (result)
+        {
+            NavigationManager.NavigateTo("/Dodaci_listy/Seznam");
+            ToastService.Notify(new(ToastType.Success, title: $"Pokladní doklad {HelperServices.NewPDNumber}", message: $"Pokladní doklad byl v pořádku smazán."));
+        }
+        else
+        {
+            ToastService.Notify(new(ToastType.Danger, title: $"Pokladní doklad {HelperServices.NewPDNumber}", message: $"Pokladní doklad nebyl v pořádku smazán."));
+        }
+        Preload.Hide();
+    }
+
+    private async Task DeleteDialog(int id)
+    {
+        var confirmation = await dialog.ShowAsync(
+            title: "Smazání Dodacího listu",
+            message1: "Vážně chcete smazat data z dodacího listu?",
+            confirmDialogOptions: new ConfirmDialogOptions()
+                {
+                    YesButtonColor = ButtonColor.Danger,
+                    YesButtonText = "Smazat",
+                    NoButtonColor = ButtonColor.Success,
+                    NoButtonText = "Zpět"
+                }
+        );
+
+        if (confirmation)
+        {
+            switch (id)
+            {
+                case 1:
+                    await UlozitDoklad();
+                    break;
+                case 2:
+                    await SmazatDoklad();
+                    break;
+            }
+        }
+    }
+
+}

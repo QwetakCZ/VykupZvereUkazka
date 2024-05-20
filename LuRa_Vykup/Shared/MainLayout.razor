@@ -1,0 +1,34 @@
+﻿@inherits LayoutComponentBase
+@using Microsoft.AspNetCore.Components.Authorization
+@using BlazorBootstrap
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Výkup Zvěře</PageTitle>
+
+<div class="page">
+    <!-- Podminka pro zobrazeni navbaru (menu) pouze pro prihlasene uzivatele -->
+    @if (AuthenticationStateProvider.GetAuthenticationStateAsync().Result.User.Identity.IsAuthenticated)
+    {
+        <div class="sidebar">
+            <NavMenu />
+        </div>
+    }
+    else
+    {
+       
+    }
+    
+
+    <main>
+        <div class="top-row px-4 auth">
+            <LoginDisplay />
+            <!-- <a href="https://docs.microsoft.com/aspnet/" target="_blank">About</a> -->
+        </div>
+        <Toasts class="p-3" AutoHide="true" Delay="4000" Placement="ToastsPlacement.BottomCenter" StackLength="5" />
+        <Preload LoadingText="Načítám..." />
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
